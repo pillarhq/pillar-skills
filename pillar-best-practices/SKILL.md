@@ -1,3 +1,8 @@
+---
+name: pillar-best-practices
+description: Best practices for integrating the Pillar SDK into React and Next.js applications. Use when adding an AI assistant panel, help center widget, or embedded product assistant.
+---
+
 # Pillar SDK Best Practices
 
 Best practices for integrating the Pillar SDK into React and Next.js applications. Use when adding an AI assistant panel, help center widget, or embedded product assistant.
