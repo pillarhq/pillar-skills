@@ -38,7 +38,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 function App() {
   return (
-    <PillarProvider helpCenter="your-help-center-slug">
+    <PillarProvider productKey="your-product-key">
       <YourApp />
     </PillarProvider>
   );
@@ -57,7 +57,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PillarProvider helpCenter={process.env.NEXT_PUBLIC_PILLAR_HELP_CENTER!}>
+    <PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
       {children}
     </PillarProvider>
   );
@@ -89,7 +89,7 @@ All configuration is optional with sensible defaults:
 
 ```tsx
 <PillarProvider
-  helpCenter="your-help-center"
+  productKey="your-product-key"
   config={{
     edgeTrigger: {
       enabled: true,  // Show sidebar tab on screen edge
@@ -387,7 +387,7 @@ show_product: {
 
 // Register the card component
 <PillarProvider
-  helpCenter="..."
+  productKey="..."
   cards={{
     show_product: ({ data, onComplete }) => (
       <ProductCard product={data} onSelect={() => onComplete({ success: true })} />
@@ -400,7 +400,7 @@ show_product: {
 
 ```bash
 # .env.local
-NEXT_PUBLIC_PILLAR_HELP_CENTER=your-help-center-slug
+NEXT_PUBLIC_PILLAR_PRODUCT_KEY=your-product-key
 ```
 
 ## TypeScript Support
@@ -437,7 +437,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PillarProvider helpCenter={process.env.NEXT_PUBLIC_PILLAR_HELP_CENTER!}>
+    <PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
       {children}
     </PillarProvider>
   );

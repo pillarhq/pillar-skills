@@ -34,7 +34,7 @@ Always wrap your app with `PillarProvider`:
 ```tsx
 import { PillarProvider } from '@pillar-ai/react';
 
-<PillarProvider helpCenter="your-slug">
+<PillarProvider productKey="your-product-key">
   {children}
 </PillarProvider>
 ```
@@ -51,7 +51,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PillarProvider helpCenter={process.env.NEXT_PUBLIC_PILLAR_HELP_CENTER!}>
+    <PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
       {children}
     </PillarProvider>
   );

@@ -21,7 +21,7 @@ function App() {
   return (
     <div>
       <Header />
-      <PillarProvider helpCenter="...">
+      <PillarProvider productKey="...">
         <MainContent />
       </PillarProvider>
     </div>
@@ -36,7 +36,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 function App() {
   return (
-    <PillarProvider helpCenter="your-help-center-slug">
+    <PillarProvider productKey="your-product-key">
       <YourApp />
     </PillarProvider>
   );
@@ -47,7 +47,7 @@ function App() {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `helpCenter` | `string` | Your help center slug from the Pillar dashboard |
+| `productKey` | `string` | Your product key from the Pillar app |
 
 ## Optional Props
 
@@ -60,13 +60,13 @@ function App() {
 
 ## Environment Variables
 
-Store your help center slug in an environment variable:
+Store your product key in an environment variable:
 
 ```bash
 # .env.local
-NEXT_PUBLIC_PILLAR_HELP_CENTER=your-help-center-slug
+NEXT_PUBLIC_PILLAR_PRODUCT_KEY=your-product-key
 ```
 
 ```tsx
-<PillarProvider helpCenter={process.env.NEXT_PUBLIC_PILLAR_HELP_CENTER!}>
+<PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
 ```

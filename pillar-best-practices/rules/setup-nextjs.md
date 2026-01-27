@@ -13,7 +13,7 @@ export default function RootLayout({ children }) {
   return (
     <html>
       <body>
-        <PillarProvider helpCenter="...">
+        <PillarProvider productKey="...">
           {children}
         </PillarProvider>
       </body>
@@ -36,7 +36,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PillarProvider helpCenter={process.env.NEXT_PUBLIC_PILLAR_HELP_CENTER!}>
+    <PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
       {children}
     </PillarProvider>
   );
