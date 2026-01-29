@@ -155,6 +155,7 @@ export const actions = defineActions({
 |------|-------------|----------|
 | `navigate` | Navigate to a page in your app | Settings, dashboard, detail pages |
 | `trigger_action` | Run custom logic | Open modals, start wizards, toggle features |
+| `query` | Fetch data and return to the agent | List items, get details, lookups (auto-sets `returns: true`) |
 | `inline_ui` | Show interactive UI in chat | Forms, confirmations, previews |
 | `external_link` | Open URL in new tab | Documentation, external resources |
 | `copy_text` | Copy text to clipboard | API keys, code snippets |
@@ -485,6 +486,49 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 ```
+
+## Agent Guidance (Admin Configuration)
+
+Agent Guidance is a product-level setting that allows you to customize the AI agent's behavior for your specific product. This is configured in the admin dashboard, not in SDK code.
+
+### What is Agent Guidance?
+
+Agent Guidance is custom instructions injected into the AI agent's prompt at runtime. Use it to:
+- Tell the agent to prefer certain action types over others
+- Provide product-specific workflows and best practices
+- Guide the agent on how to handle complex multi-step tasks
+
+### Configuring Agent Guidance
+
+1. Go to the admin dashboard
+2. Navigate to **Configure** > **AI Assistant**
+3. Scroll to the **Agent Guidance** section
+4. Enter your custom instructions
+
+### Example Agent Guidance
+
+```text
+PREFER API ACTIONS OVER NAVIGATION:
+- If both "create_chart" (API action) and "navigate_to_chart_builder" (navigation) are available, prefer the API action
+- API actions execute instantly; navigation requires user to complete forms manually
+
+DASHBOARD CREATION WORKFLOW:
+When user wants to build a dashboard:
+1. First use list_datasets to find available data sources
+2. Then use get_dataset_columns to understand the schema
+3. Based on column types, choose appropriate chart types:
+   - Categorical columns → bar charts, pie charts
+   - Numeric columns → big number totals, aggregations
+   - Date columns → time series, trend charts
+4. Create a plan: create_dashboard → create_chart → add_chart_to_dashboard → (repeat) → navigate_to_dashboard
+```
+
+### Tips for Writing Good Guidance
+
+1. **Be specific** - Tell the agent exactly what to prefer and when
+2. **Provide workflows** - Describe multi-step processes the agent should follow
+3. **Reference your actions** - Use exact action names from your action definitions
+4. **Keep it focused** - Only include guidance relevant to common user requests
 
 ## Learn More
 
