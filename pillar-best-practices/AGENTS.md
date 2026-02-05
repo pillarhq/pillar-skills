@@ -487,52 +487,199 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-## Agent Guidance (Admin Configuration)
+## Action Decomposition
 
-Agent Guidance is a product-level setting that allows you to customize the AI agent's behavior for your specific product. This is configured in the admin dashboard, not in SDK code.
+When an API or feature has many modes, don't model it as one action with a large schema and conditional fields. Split it into smaller actions that each do one thing.
 
-### What is Agent Guidance?
+### Why
 
-Agent Guidance is custom instructions injected into the AI agent's prompt at runtime. Use it to:
-- Tell the agent to prefer certain action types over others
-- Provide product-specific workflows and best practices
-- Guide the agent on how to handle complex multi-step tasks
+Your `dataSchema` is converted directly into the AI tool's parameter schema. Large schemas with optional/conditional fields cause:
+- The AI guessing at fields it doesn't need
+- Ambiguous intent matching (which mode did the user mean?)
+- Harder debugging when a tool call fails
 
-### Configuring Agent Guidance
+Smaller schemas mean the AI fills in fewer fields, picks the right tool more often, and errors are easier to trace.
+
+### Pattern
+
+```tsx
+// Before: one action with an operation switch
+manage_report: {
+  description: 'Create, schedule, or export a report',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      operation: { type: 'string', enum: ['create', 'schedule', 'export'] },
+      name: { type: 'string' },
+      format: { type: 'string', enum: ['pdf', 'csv'] },
+      schedule: { type: 'string' },
+      filters: { type: 'object' },
+    },
+  },
+}
+
+// After: three actions, each with only the fields it needs
+create_report: {
+  description: 'Create a new report with filters',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Report name' },
+      filters: { type: 'object', description: 'Filter criteria' },
+    },
+    required: ['name'],
+  },
+}
+
+schedule_report: {
+  description: 'Set a recurring schedule for an existing report',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      reportId: { type: 'string' },
+      schedule: { type: 'string', description: 'Cron expression or preset like "daily", "weekly"' },
+    },
+    required: ['reportId', 'schedule'],
+  },
+}
+
+export_report: {
+  description: 'Export a report to PDF or CSV',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      reportId: { type: 'string' },
+      format: { type: 'string', enum: ['pdf', 'csv'] },
+    },
+    required: ['reportId', 'format'],
+  },
+}
+```
+
+The handlers can share internal logic. The point is that the AI sees three clearly scoped tools instead of one ambiguous one.
+
+### When to Split
+
+Split when an action has:
+- An "operation" or "mode" field that changes which other fields are required
+- More than 5-6 properties in the schema
+- Conditional required fields (field X is required only when field Y is "foo")
+- Multiple distinct user intents mapping to one action name
+
+Keep it as one action when:
+- All fields are always relevant regardless of input
+- The action is simple (1-3 properties)
+- Splitting would create nearly identical actions
+
+## How Actions Become Tools
+
+When the agent finds your actions via search, they are registered as native tools in the LLM's tool-calling API. This means:
+
+1. Your action's `description` becomes the tool description
+2. Your action's `dataSchema` becomes the tool's `parameters` JSON Schema
+3. The AI calls the tool by name with structured arguments matching your schema
+4. The SDK executes your handler with those arguments and returns the result
+
+This is why `dataSchema` quality matters so much. The schema _is_ the tool definition the model sees.
+
+```
+Client defines action          Server converts to tool         AI calls tool
++------------------+          +---------------------+         +-----------------+
+| name: invite_user|   sync   | name: invite_user   |  call   | invite_user({   |
+| description: ... | -------> | description: ...    | ------> |   email: "...", |
+| dataSchema: {    |          | parameters: {       |         |   role: "admin" |
+|   email, role    |          |   email, role       |         | })              |
+| }                |          | }                   |         |                 |
++------------------+          +---------------------+         +-----------------+
+```
+
+Actions with `returns: true` (or `type: 'query'`) send the handler's return value back to the agent for further reasoning.
+
+## Agent Guidance
+
+Agent Guidance is custom instructions injected into the AI agent's prompt at runtime. Use it to tell the agent how to choose between actions, describe multi-step workflows, and provide domain knowledge.
+
+### Two Ways to Configure
+
+**1. Admin dashboard** (no deploy required):
 
 1. Go to the admin dashboard
 2. Navigate to **Configure** > **AI Assistant**
-3. Scroll to the **Agent Guidance** section
-4. Enter your custom instructions
+3. Enter instructions in the **Agent Guidance** textarea
+4. Save changes
 
-### Example Agent Guidance
+**2. Code sync via `agentGuidance` export** (deployed with your actions):
 
-```text
+Export an `agentGuidance` string alongside your actions. `pillar-sync` sends it to the backend automatically:
+
+```tsx
+// lib/pillar/actions/index.ts
+export const actions = { /* ... */ };
+
+export const agentGuidance = `
 PREFER API ACTIONS OVER NAVIGATION:
-- If both "create_chart" (API action) and "navigate_to_chart_builder" (navigation) are available, prefer the API action
+- When both an API action and a navigation action can accomplish a task, prefer the API action
 - API actions execute instantly; navigation requires user to complete forms manually
 
-DASHBOARD CREATION WORKFLOW:
-When user wants to build a dashboard:
-1. First use list_datasets to find available data sources
-2. Then use get_dataset_columns to understand the schema
-3. Based on column types, choose appropriate chart types:
-   - Categorical columns → bar charts, pie charts
-   - Numeric columns → big number totals, aggregations
-   - Date columns → time series, trend charts
-4. Create a plan: create_dashboard → create_chart → add_chart_to_dashboard → (repeat) → navigate_to_dashboard
+ORDER FULFILLMENT WORKFLOW:
+When a user asks to process an order:
+1. Use get_order to fetch order details
+2. Use validate_inventory to check stock
+3. Use create_shipment to generate shipping label
+4. Use notify_customer to send confirmation
+`;
 ```
 
-### Tips for Writing Good Guidance
+Then sync:
 
-1. **Be specific** - Tell the agent exactly what to prefer and when
-2. **Provide workflows** - Describe multi-step processes the agent should follow
-3. **Reference your actions** - Use exact action names from your action definitions
-4. **Keep it focused** - Only include guidance relevant to common user requests
+```bash
+PILLAR_SLUG=your-product PILLAR_SECRET=xxx npx pillar-sync --actions ./lib/pillar/actions/index.ts
+```
+
+The code-sync path is useful when your guidance references specific action names and should stay in version control alongside those actions.
+
+### Tips for Writing Guidance
+
+1. Tell the agent what to prefer and when, referencing exact action names
+2. Describe multi-step workflows as numbered sequences
+3. Keep it focused on common requests (not an exhaustive manual)
+4. Update as you add or rename actions
+
+## Parameter Examples (Advanced)
+
+For complex schemas, you can provide concrete examples of valid parameter objects. These are stored alongside the action and shown to the AI when it needs to fill in the schema.
+
+```tsx
+create_report: {
+  description: 'Create a new report with filters',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      filters: { type: 'object' },
+    },
+    required: ['name'],
+  },
+  parameterExamples: [
+    {
+      description: 'Monthly sales report filtered by region',
+      parameters: {
+        name: 'Monthly Sales - West',
+        filters: { region: 'west', period: 'last_30_days' },
+      },
+    },
+  ],
+}
+```
 
 ## Learn More
 
-- [Pillar SDK Documentation](https://help.trypillar.com/docs)
-- [Actions Guide](https://help.trypillar.com/docs/guides/actions)
-- [Context API](https://help.trypillar.com/docs/guides/context)
-- [Custom Cards](https://help.trypillar.com/docs/guides/custom-cards)
+- [Pillar SDK Documentation](https://trypillar.com/docs)
+- [Actions Guide](https://trypillar.com/docs/guides/actions)
+- [Context API](https://trypillar.com/docs/guides/context)
+- [Custom Cards](https://trypillar.com/docs/guides/custom-cards)

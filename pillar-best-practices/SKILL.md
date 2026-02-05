@@ -22,7 +22,7 @@ Reference these guidelines when:
 |----------|------|-------------|
 | CRITICAL | `setup-provider` | Always wrap your app with PillarProvider |
 | CRITICAL | `setup-nextjs` | Next.js App Router requires a 'use client' wrapper |
-| HIGH | `action-descriptions` | Write specific, AI-matchable descriptions |
+| HIGH | `action-descriptions` | Write specific, AI-matchable descriptions and keep actions focused |
 | HIGH | `action-handlers` | Use centralized handlers with proper cleanup |
 
 ## Quick Reference
@@ -111,6 +111,20 @@ export function PillarActionHandlers() {
   return null;
 }
 ```
+
+### 5. Decompose Large Actions (HIGH)
+
+Prefer smaller actions with tight schemas over one large action with many modes:
+
+```tsx
+// Instead of one "manage_user" with an operation enum,
+// split into focused actions:
+invite_user: { description: 'Invite a new user by email', type: 'trigger_action' }
+remove_user: { description: 'Remove a user from the org', type: 'trigger_action' }
+change_user_role: { description: 'Change a user role', type: 'trigger_action' }
+```
+
+Your `dataSchema` becomes the tool parameter schema in the AI's tool-calling API, so tight schemas produce more reliable tool calls.
 
 ## How to Use
 

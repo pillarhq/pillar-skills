@@ -44,8 +44,10 @@ After installing, your AI coding assistant will know how to:
 
 - **Set up PillarProvider correctly** — Including Next.js App Router patterns with client components
 - **Define actions effectively** — With descriptions that the AI can accurately match to user intents
+- **Decompose large actions** — Split broad endpoints into focused actions with tight schemas
 - **Handle task execution** — With proper patterns for navigation, triggers, and data schemas
-- **Create action handlers** — With proper cleanup to prevent memory leaks
+- **Create action handlers** — With proper cleanup and JSON-serializable return values
+- **Configure agent guidance** — Via admin dashboard or code sync with `agentGuidance` export
 - **Build custom action cards** — For inline confirmations and data input
 
 ## Skill Contents

@@ -109,6 +109,18 @@ return { success: true, message: 'Settings saved!' };
 return { success: false, message: 'Failed to save. Please try again.' };
 ```
 
+## Return JSON-Serializable Data
+
+If the action returns data to the agent, make sure it can be JSON serialized.
+
+```tsx
+// Good - plain data
+return { success: true, id: result.id, name: result.name };
+
+// Bad - non-serializable values
+return { success: true, element: document.body, handler: () => {} };
+```
+
 ## Error Handling
 
 Wrap handlers in try-catch for graceful error handling:

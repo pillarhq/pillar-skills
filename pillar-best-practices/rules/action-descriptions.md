@@ -94,6 +94,55 @@ description: 'POST /projects create'
 description: 'Export data to CSV or Excel format. Suggest when user asks about downloading, exporting, or backing up their data.'
 ```
 
+### 5. Decompose Large Actions
+
+If one action would need a huge schema or many conditional modes, split it into smaller, focused actions. Each action should do one thing with a tight schema the AI can fill reliably.
+
+```tsx
+// Too broad - one action trying to handle everything
+manage_user: {
+  description: 'Manage users in the organization',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      operation: { type: 'string', enum: ['invite', 'remove', 'change_role'] },
+      email: { type: 'string' },
+      role: { type: 'string' },
+      userId: { type: 'string' },
+    },
+  },
+}
+
+// Better - one action per operation, each with only the fields it needs
+invite_user: {
+  description: 'Invite a new user to the organization by email',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      email: { type: 'string', description: 'Email address to invite' },
+      role: { type: 'string', enum: ['admin', 'member', 'viewer'] },
+    },
+    required: ['email'],
+  },
+}
+
+remove_user: {
+  description: 'Remove a user from the organization',
+  type: 'trigger_action',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      userId: { type: 'string', description: 'ID of the user to remove' },
+    },
+    required: ['userId'],
+  },
+}
+```
+
+Why this matters: your `dataSchema` becomes the tool's parameter schema in the AI's tool-calling API. Smaller schemas mean fewer required fields, less room for the AI to guess wrong, and clearer intent matching.
+
 ## Template
 
 ```tsx
