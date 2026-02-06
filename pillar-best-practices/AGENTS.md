@@ -599,6 +599,17 @@ Client defines action          Server converts to tool         AI calls tool
 
 Actions with `returns: true` (or `type: 'query'`) send the handler's return value back to the agent for further reasoning.
 
+## Schema Compatibility
+
+Pillar routes tool calls to multiple LLM providers (OpenAI, Anthropic, Google Gemini via OpenRouter). Gemini validates schemas more strictly than other providers and will reject tool calls with a 400 error if the schema is invalid. Follow these rules in every `dataSchema`:
+
+1. **Arrays need `items`** - `{ type: 'array' }` is invalid. Use `{ type: 'array', items: { type: 'string' } }` or similar.
+2. **`type` must be a single string** - `type: ['string', 'null']` is invalid. Use `type: 'string'` and note nullability in the description.
+3. **Objects need `properties`** - `{ type: 'object' }` without properties is invalid. Add at least one property, or use `type: 'string'` for freeform data.
+4. **`required` must match `properties`** - Every entry in `required` must be a key in `properties`.
+
+See `rules/schema-compatibility.md` for the full rules, examples, and a review checklist.
+
 ## Agent Guidance
 
 Agent Guidance is custom instructions injected into the AI agent's prompt at runtime. Use it to tell the agent how to choose between actions, describe multi-step workflows, and provide domain knowledge.

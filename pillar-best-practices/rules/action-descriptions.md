@@ -143,6 +143,8 @@ remove_user: {
 
 Why this matters: your `dataSchema` becomes the tool's parameter schema in the AI's tool-calling API. Smaller schemas mean fewer required fields, less room for the AI to guess wrong, and clearer intent matching.
 
+Schemas must also follow cross-model formatting rules. Pillar routes to multiple LLM providers, and Gemini rejects schemas that use array type unions (`type: ['string', 'null']`) or arrays without `items`. See `rules/schema-compatibility.md` for the full list.
+
 ## Template
 
 ```tsx

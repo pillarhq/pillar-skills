@@ -22,6 +22,7 @@ Reference these guidelines when:
 |----------|------|-------------|
 | CRITICAL | `setup-provider` | Always wrap your app with PillarProvider |
 | CRITICAL | `setup-nextjs` | Next.js App Router requires a 'use client' wrapper |
+| CRITICAL | `schema-compatibility` | dataSchema must follow cross-model formatting rules (arrays need items, no type unions) |
 | HIGH | `action-descriptions` | Write specific, AI-matchable descriptions and keep actions focused |
 | HIGH | `action-handlers` | Use centralized handlers with proper cleanup |
 
@@ -135,6 +136,7 @@ rules/setup-provider.md
 rules/setup-nextjs.md
 rules/action-descriptions.md
 rules/action-handlers.md
+rules/schema-compatibility.md
 ```
 
 For the complete guide with all patterns expanded: `AGENTS.md`
