@@ -145,16 +145,94 @@ Why this matters: your `dataSchema` becomes the tool's parameter schema in the A
 
 Schemas must also follow cross-model formatting rules. Pillar routes to multiple LLM providers, and Gemini rejects schemas that use array type unions (`type: ['string', 'null']`) or arrays without `items`. See `rules/schema-compatibility.md` for the full list.
 
+### Design for Verification Loops
+
+For actions that create or modify resources via API, add a companion query action that lets the agent validate first. This prevents the agent from committing broken configurations it can't recover from.
+
+The pattern:
+
+1. A `test_*` or `preview_*` query action that validates the input and returns sample data
+2. A `create_*` action with `returns: true` that commits the change
+3. Agent guidance that tells the AI to always test before creating
+
+```tsx
+// Query action: agent validates the data first
+test_report_query: {
+  description: 'Test a report query and return sample results',
+  type: 'query',
+  guidance: 'Use this before create_report to verify the query returns data. If it returns 0 rows, the query is wrong.',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      datasource_id: { type: 'number', description: 'Dataset to query' },
+      filters: { type: 'object', properties: {} },
+    },
+    required: ['datasource_id'],
+  },
+}
+
+// Creation action: only called after query is verified
+create_report: {
+  description: 'Create a report from a validated query',
+  type: 'trigger_action',
+  returns: true,
+  guidance: 'Always test the query with test_report_query first. Only create after it returns valid data.',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      datasource_id: { type: 'number' },
+      filters: { type: 'object', properties: {} },
+    },
+    required: ['name', 'datasource_id'],
+  },
+}
+```
+
+The agent guidance then tells the AI: "Always test queries with test_report_query before calling create_report."
+
+This is the same pattern used in the Superset copilot (`test_chart_query` -> `create_bar_chart`) and the Grafana copilot (`test_datasource_query` -> `create_timeseries_panel`). Without verification, the agent creates broken panels and has no way to detect or fix them.
+
+### 6. Use the `guidance` Field
+
+`description` and `guidance` serve different purposes:
+
+- **`description`** is for intent matching -- it helps the AI find the right action when the user asks something. Keep it short and matchable.
+- **`guidance`** is for usage instructions -- it tells the AI *how* to use the action correctly once it's been selected. Put caveats, chaining requirements, and pitfalls here.
+
+```tsx
+// Bad - everything crammed into description
+create_chart: {
+  description: 'Create a chart on a dashboard. Always test the query first with test_query. Returns chart_id. Use dashboards array to link. Pie charts use singular metric not array.',
+}
+
+// Good - description for matching, guidance for instructions
+create_chart: {
+  description: 'Create a chart on a dashboard',
+  guidance:
+    'Always test the query with test_datasource_query first. ' +
+    'Returns chart_id which can be used with add_chart_to_dashboard. ' +
+    'Pie charts use a singular metric field, not the metrics array.',
+}
+```
+
+Use `guidance` for:
+- Chaining requirements ("call X before Y")
+- What the return value contains and how to use it
+- Common pitfalls ("field Z must be in format ABC")
+- When to prefer this action over a similar one
+
 ## Template
 
 ```tsx
 {
   description: '[Action verb] [what it does]. Suggest when user asks about [related topics].',
+  guidance: '[When to use, prerequisites, pitfalls, what it returns]',
   examples: [
     'natural phrase 1',
     'natural phrase 2',
     'question form',
   ],
-  type: 'navigate' | 'trigger_action' | 'inline_ui',
+  type: 'navigate' | 'trigger_action' | 'query' | 'inline_ui',
 }
 ```

@@ -575,6 +575,111 @@ Keep it as one action when:
 - The action is simple (1-3 properties)
 - Splitting would create nearly identical actions
 
+### Verification Loop Pattern
+
+For actions that create or modify resources via API, add a companion query action that validates input before committing. Without this, the agent creates broken configurations and has no way to detect or fix them.
+
+The pattern:
+
+1. A `test_*` or `preview_*` query action that validates the input and returns sample data
+2. A `create_*` action with `returns: true` that commits the change
+3. Agent guidance that tells the AI to always test before creating
+
+```tsx
+// Step 1: Query action -- agent validates the data first
+test_chart_query: {
+  description: 'Test a chart query and return sample results',
+  type: 'query',
+  guidance: 'Use this before any create_*_chart action to verify the query returns data.',
+  dataSchema: {
+    type: 'object',
+    properties: {
+      datasource: { type: 'object', properties: { id: { type: 'number' }, type: { type: 'string' } }, required: ['id', 'type'] },
+      queries: { type: 'array', items: { type: 'object', properties: { columns: { type: 'array', items: { type: 'object' } }, metrics: { type: 'array', items: { type: 'object' } } }, required: ['columns', 'metrics'] } },
+    },
+    required: ['datasource', 'queries'],
+  },
+  autoRun: true,
+  autoComplete: true,
+}
+
+// Step 2: Creation action -- only called after query is verified
+create_bar_chart: {
+  description: 'Create a bar chart via API with full configuration',
+  type: 'trigger_action',
+  returns: true,
+  guidance: 'Always test the query with test_chart_query first. Only create after it returns valid data.',
+  dataSchema: { /* tight schema for bar chart params */ },
+  autoRun: true,
+  autoComplete: true,
+}
+```
+
+This is the pattern used in the Superset copilot (`test_chart_query` -> `create_bar_chart`) and Grafana copilot (`test_datasource_query` -> `create_timeseries_panel`). The agent guidance then encodes the workflow:
+
+```tsx
+export const agentGuidance = `
+VERIFY BEFORE COMMITTING:
+When creating visualizations, always test the query against the data source first.
+If it returns data, proceed with creating the visualization.
+If it returns no data or errors, adjust the query and re-test.
+Never create a visualization with an unverified query.
+`;
+```
+
+### Reusable Schema Components
+
+When multiple actions share the same schema shapes (metrics, filters, columns), define them as shared objects and reference them across actions. This keeps schemas consistent and reduces duplication.
+
+```tsx
+// Shared schema components
+const metricSchema = {
+  type: 'object',
+  description: 'Metric object for aggregation',
+  properties: {
+    expressionType: { type: 'string', enum: ['SQL', 'SIMPLE'] },
+    sqlExpression: { type: 'string', description: 'SQL expression like "SUM(amount)"' },
+    label: { type: 'string', description: 'Display label for the metric' },
+  },
+  required: ['expressionType', 'label'],
+};
+
+const filterSchema = {
+  type: 'object',
+  properties: {
+    column: { type: 'string', description: 'Column name to filter' },
+    operator: { type: 'string', description: 'Comparison operator' },
+    value: { type: 'string', description: 'Filter value' },
+  },
+  required: ['column', 'operator', 'value'],
+};
+
+// Used in multiple actions
+create_bar_chart: {
+  dataSchema: {
+    type: 'object',
+    properties: {
+      metrics: { type: 'array', items: metricSchema },
+      filters: { type: 'array', items: filterSchema },
+      // ...
+    },
+  },
+}
+
+create_line_chart: {
+  dataSchema: {
+    type: 'object',
+    properties: {
+      metrics: { type: 'array', items: metricSchema },  // same schema
+      filters: { type: 'array', items: filterSchema },  // same schema
+      // ...
+    },
+  },
+}
+```
+
+This pattern is used in the Superset copilot where `metricSchema`, `adhocFilterSchema`, and `xAxisColumnSchema` are shared across all chart creation actions.
+
 ## How Actions Become Tools
 
 When the agent finds your actions via search, they are registered as native tools in the LLM's tool-calling API. This means:
@@ -632,16 +737,17 @@ Export an `agentGuidance` string alongside your actions. `pillar-sync` sends it 
 export const actions = { /* ... */ };
 
 export const agentGuidance = `
-PREFER API ACTIONS OVER NAVIGATION:
-- When both an API action and a navigation action can accomplish a task, prefer the API action
-- API actions execute instantly; navigation requires user to complete forms manually
+PREFER API OVER NAVIGATION:
+- When you can accomplish a task via API, prefer that over navigating to a form
+- API actions execute instantly and return structured results
+- Only navigate when no API alternative exists
 
-ORDER FULFILLMENT WORKFLOW:
+ORDER FULFILLMENT:
 When a user asks to process an order:
-1. Use get_order to fetch order details
-2. Use validate_inventory to check stock
-3. Use create_shipment to generate shipping label
-4. Use notify_customer to send confirmation
+1. Look up the order details first
+2. Verify inventory is available
+3. Generate the shipment
+4. Notify the customer when complete
 `;
 ```
 
@@ -657,8 +763,33 @@ The code-sync path is useful when your guidance references specific action names
 
 1. Tell the agent what to prefer and when, referencing exact action names
 2. Describe multi-step workflows as numbered sequences
-3. Keep it focused on common requests (not an exhaustive manual)
-4. Update as you add or rename actions
+3. Include verification steps where relevant ("test first, then create")
+4. Keep it focused on common requests (not an exhaustive manual)
+5. Update as you add or rename actions
+
+### Verification Workflow Example
+
+For copilots that create resources via API, agent guidance should encode the verify-then-commit loop:
+
+```tsx
+export const agentGuidance = `
+PREFER API OVER NAVIGATION:
+- API actions execute instantly and return structured results
+- Navigation requires the user to fill out forms manually
+- Only navigate when no API alternative exists
+
+CREATING VISUALIZATIONS:
+When building charts or dashboards:
+1. First discover what data sources are available
+2. Inspect the data to understand columns and types
+3. Test the query to confirm it returns data before creating anything
+4. If the test fails, adjust the query and re-test
+5. Only create the visualization after validation succeeds
+6. Show the user the result when done
+`;
+```
+
+This ensures the agent validates before committing. The same pattern applies to any create workflow: test first, then commit.
 
 ## Parameter Examples (Advanced)
 
