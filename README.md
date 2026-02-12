@@ -30,7 +30,6 @@ Skills are reusable capabilities for AI coding agents that provide procedural kn
 
 ```bash
 npx skills add pillarhq/pillar-skills --skill pillar-best-practices
-npx skills add pillarhq/pillar-skills --skill webmcp
 ```
 
 ## Available Skills
@@ -38,11 +37,8 @@ npx skills add pillarhq/pillar-skills --skill webmcp
 | Skill | Description |
 |-------|-------------|
 | `pillar-best-practices` | Best practices for embedding Pillar's AI co-pilot into React/Next.js applications |
-| `webmcp` | Implement WebMCP tools that expose web app functionality to AI agents via the W3C `navigator.modelContext` API |
 
 ## What's Included
-
-### pillar-best-practices
 
 After installing, your AI coding assistant will know how to:
 
@@ -53,17 +49,6 @@ After installing, your AI coding assistant will know how to:
 - **Create action handlers** — With proper cleanup and JSON-serializable return values
 - **Configure agent guidance** — Via admin dashboard or code sync with `agentGuidance` export
 - **Build custom action cards** — For inline confirmations and data input
-
-### webmcp
-
-After installing, your AI coding assistant will know how to:
-
-- **Register WebMCP tools correctly** — With name, description, inputSchema, and execute callback
-- **Write effective tool descriptions** — That agents can match to user intent and reason about
-- **Handle security properly** — Validate params, confirm destructive actions, avoid data leaks
-- **Manage dynamic tool sets** — Register/unregister tools as SPA state changes
-- **Implement user confirmation flows** — Via `agent.requestUserInteraction()` for sensitive operations
-- **Use service worker tools** — For background operations without a visible page
 
 ## Skill Contents
 
@@ -80,23 +65,7 @@ pillar-best-practices/
     └── action-handlers.md    # Task handler implementation patterns
 ```
 
-The `webmcp` skill includes:
-
-```
-webmcp/
-├── SKILL.md                    # Skill metadata and quick reference
-├── AGENTS.md                   # Complete WebMCP API reference
-└── rules/
-    ├── tool-definition.md      # Tool registration and response format
-    ├── descriptions.md         # Writing effective tool descriptions
-    ├── security.md             # Validation, confirmation, data safety
-    ├── dynamic-registration.md # SPA state-aware tool management
-    └── user-interaction.md     # User confirmation flows
-```
-
 ## Example Usage
-
-### pillar-best-practices
 
 Once installed, simply ask your AI assistant:
 
@@ -108,18 +77,6 @@ Your assistant will automatically:
 3. Handle Next.js App Router requirements if applicable
 4. Define actions with clear descriptions
 5. Create task handlers with correct patterns
-
-### webmcp
-
-Ask your AI assistant:
-
-> "Add WebMCP tools to this page so browser agents can interact with it"
-
-Your assistant will automatically:
-1. Feature-detect `navigator.modelContext`
-2. Register tools with proper schemas and descriptions
-3. Add user confirmation for destructive operations
-4. Handle cleanup on component unmount in SPAs
 
 ## Related Packages
 
