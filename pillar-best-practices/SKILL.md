@@ -95,7 +95,7 @@ pillar.defineTool({
 });
 ```
 
-Sync with: `npx pillar-sync --scan ./src/actions`
+Sync with: `npx pillar-sync --scan ./src/tools`
 
 ### 5. Guidance Field (HIGH)
 

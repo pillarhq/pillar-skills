@@ -262,7 +262,7 @@ Key differences from `defineActions` + `onTask()`:
 ### Automatic scanning (recommended)
 
 ```bash
-PILLAR_SLUG=my-app PILLAR_SECRET=xxx npx pillar-sync --scan ./src/actions
+PILLAR_SLUG=my-app PILLAR_SECRET=xxx npx pillar-sync --scan ./src/tools
 ```
 
 The scanner uses the TypeScript compiler API to statically extract metadata from `defineTool()` and `defineActions()` calls. It extracts: `name`, `description`, `guidance`, `type`, `inputSchema`, `examples`, `autoRun`, `autoComplete`.

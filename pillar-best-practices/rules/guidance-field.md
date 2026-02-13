@@ -64,7 +64,7 @@ navigate_to_dashboard: {
 When using `defineTool()`, the `guidance` field is extracted automatically by the AST scanner:
 
 ```bash
-npx pillar-sync --scan ./src/actions
+npx pillar-sync --scan ./src/tools
 ```
 
 The scanner reads `guidance` as a static string from the `defineTool()` call and includes it in the manifest sent to the backend. No separate sync file or manual configuration needed.
