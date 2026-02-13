@@ -85,7 +85,7 @@ pillar.defineTool({
   name: 'create_dashboard',
   description: 'Create a new empty dashboard.',
   guidance: 'First step in dashboard workflow. Returns dashboard_uid needed by create_*_panel tools.',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   autoRun: true,
   inputSchema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
   execute: async (data) => {
@@ -124,9 +124,9 @@ Prefer smaller tools with tight schemas over one large tool with many modes:
 ```tsx
 // Instead of one "manage_user" with an operation enum,
 // split into focused tools:
-invite_user: { description: 'Invite a new user by email', type: 'trigger_action' }
-remove_user: { description: 'Remove a user from the org', type: 'trigger_action' }
-change_user_role: { description: 'Change a user role', type: 'trigger_action' }
+invite_user: { description: 'Invite a new user by email', type: 'trigger_tool' }
+remove_user: { description: 'Remove a user from the org', type: 'trigger_tool' }
+change_user_role: { description: 'Change a user role', type: 'trigger_tool' }
 ```
 
 ## How to Use

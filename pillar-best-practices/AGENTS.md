@@ -127,26 +127,31 @@ Tools are things users can do in your app that the AI can suggest.
 
 ```tsx
 // lib/pillar/tools.ts
-import { defineActions } from '@pillar-ai/sdk';
+import { PillarProvider, usePillarTool } from '@pillar-ai/react';
 
-export const actions = defineActions({
-  open_settings: {
+function useAppTools() {
+  const router = useRouter();
+
+  usePillarTool({
+    name: 'open_settings',
     description: 'Navigate to the settings page',
     type: 'navigate',
-    path: '/settings',
     autoRun: true,
-  },
+    execute: () => router.push('/settings'),
+  });
 
-  invite_member: {
+  usePillarTool({
+    name: 'invite_member',
     description: 'Open the invite team member modal',
     examples: [
       'invite someone to my team',
       'add a new user',
       'how do I invite people?',
     ],
-    type: 'trigger_action',
-  },
-});
+    type: 'trigger_tool',
+    execute: () => openInviteModal(),
+  });
+}
 ```
 
 ### Tool Types
@@ -154,7 +159,7 @@ export const actions = defineActions({
 | Type | Description | Use Case |
 |------|-------------|----------|
 | `navigate` | Navigate to a page in your app | Settings, dashboard, detail pages |
-| `trigger_action` | Run custom logic | Open modals, start wizards, toggle features |
+| `trigger_tool` | Run custom logic | Open modals, start wizards, toggle features |
 | `query` | Fetch data and return to the agent | List items, get details, lookups (auto-sets `returns: true`) |
 | `inline_ui` | Show interactive UI in chat | Forms, confirmations, previews |
 | `external_link` | Open URL in new tab | Documentation, external resources |
@@ -192,7 +197,7 @@ Define a schema to have the AI extract structured data from user messages:
 ```tsx
 add_source: {
   description: 'Add a new knowledge source',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   dataSchema: {
     type: 'object',
     properties: {
@@ -215,7 +220,7 @@ add_source: {
 For new code, use `pillar.defineTool()` to co-locate the tool definition and handler in one call. This is the recommended pattern — it prevents drift between definition and handler, and the `guidance` field is extracted automatically by `pillar-sync --scan`.
 
 ```tsx
-// actions/dashboardCrud.ts
+// tools/dashboardCrud.ts
 import type { PillarInstance } from './types';
 
 export function registerDashboardTools(pillar: PillarInstance): Array<() => void> {
@@ -225,7 +230,7 @@ export function registerDashboardTools(pillar: PillarInstance): Array<() => void
       description: 'Create a new empty dashboard, returning its UID for panel creation.',
       guidance:
         'First step in any dashboard workflow. Returns dashboard_uid needed by all create_*_panel tools.',
-      type: 'trigger_action',
+      type: 'trigger_tool',
       autoRun: true,
       autoComplete: true,
       inputSchema: {
@@ -244,18 +249,11 @@ export function registerDashboardTools(pillar: PillarInstance): Array<() => void
 }
 ```
 
-Key differences from `defineActions` + `onTask()`:
+Key properties of `defineTool()`:
 - Handler is co-located with the definition (`execute` field)
 - Returns an unsubscribe function for cleanup
 - `guidance` field is supported and synced via `--scan`
 - All `defineTool` tools automatically return data to the agent
-
-### When to use which
-
-| Pattern | Use when | Sync method |
-|---------|----------|-------------|
-| `defineTool()` | New code, any tool | `pillar-sync --scan ./src` |
-| `defineActions` + `onTask()` | Existing codebases not yet migrated | `pillar-sync --scan ./src` |
 
 ## Tool Syncing
 
@@ -265,7 +263,7 @@ Key differences from `defineActions` + `onTask()`:
 PILLAR_SLUG=my-app PILLAR_SECRET=xxx npx pillar-sync --scan ./src/tools
 ```
 
-The scanner uses the TypeScript compiler API to statically extract metadata from `defineTool()` and `defineActions()` calls. It extracts: `name`, `description`, `guidance`, `type`, `inputSchema`, `examples`, `autoRun`, `autoComplete`.
+The scanner uses the TypeScript compiler API to statically extract metadata from `defineTool()` and `usePillarTool()` calls. It extracts: `name`, `description`, `guidance`, `type`, `inputSchema`, `examples`, `autoRun`, `autoComplete`.
 
 No barrel file or manifest needed. The scanner finds all tool definitions recursively.
 
@@ -425,7 +423,7 @@ Use `requiredContext` to control which tools the AI suggests:
 ```tsx
 delete_user: {
   description: 'Delete a user from the organization',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   requiredContext: { userRole: 'admin' },
 }
 ```
@@ -477,10 +475,10 @@ Both packages include TypeScript definitions. Get full type inference for your t
 
 ```tsx
 import { usePillar } from '@pillar-ai/react';
-import type { actions } from '@/lib/pillar/tools';
+import type { tools } from '@/lib/pillar/tools';
 
 function ToolHandlers() {
-  const { onTask } = usePillar<typeof actions>();
+  const { onTask } = usePillar<typeof tools>();
 
   useEffect(() => {
     // TypeScript knows the data shape for each tool
@@ -573,7 +571,7 @@ Smaller schemas mean the AI fills in fewer fields, picks the right tool more oft
 // Before: one tool with an operation switch
 manage_report: {
   description: 'Create, schedule, or export a report',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   dataSchema: {
     type: 'object',
     properties: {
@@ -589,7 +587,7 @@ manage_report: {
 // After: three tools, each with only the fields it needs
 create_report: {
   description: 'Create a new report with filters',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   dataSchema: {
     type: 'object',
     properties: {
@@ -602,7 +600,7 @@ create_report: {
 
 schedule_report: {
   description: 'Set a recurring schedule for an existing report',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   dataSchema: {
     type: 'object',
     properties: {
@@ -615,7 +613,7 @@ schedule_report: {
 
 export_report: {
   description: 'Export a report to PDF or CSV',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   dataSchema: {
     type: 'object',
     properties: {
@@ -690,15 +688,12 @@ Agent Guidance is custom instructions injected into the AI agent's prompt at run
 3. Enter instructions in the **Agent Guidance** textarea
 4. Save changes
 
-**2. Code sync via `agentGuidance` export** (deployed with your tools):
+**2. Code sync via `AGENT_GUIDANCE.md`** (deployed with your tools):
 
-Export an `agentGuidance` string alongside your tools. `pillar-sync` sends it to the backend automatically:
+Place an `AGENT_GUIDANCE.md` file in the directory you pass to `--scan`. The CLI picks it up automatically -- no JS export or barrel file needed:
 
-```tsx
-// lib/pillar/tools/index.ts
-export const actions = { /* ... */ };
-
-export const agentGuidance = `
+```markdown
+<!-- src/tools/AGENT_GUIDANCE.md -->
 PREFER API TOOLS OVER NAVIGATION:
 - When both an API tool and a navigation tool can accomplish a task, prefer the API tool
 - API tools execute instantly; navigation requires user to complete forms manually
@@ -709,16 +704,15 @@ When a user asks to process an order:
 2. Use validate_inventory to check stock
 3. Use create_shipment to generate shipping label
 4. Use notify_customer to send confirmation
-`;
 ```
 
 Then sync:
 
 ```bash
-PILLAR_SLUG=your-product PILLAR_SECRET=xxx npx pillar-sync --scan ./lib/pillar/tools
+PILLAR_SLUG=your-product PILLAR_SECRET=xxx npx pillar-sync --scan ./src/tools
 ```
 
-The code-sync path is useful when your guidance references specific tool names and should stay in version control alongside those tools.
+The scanner reads `AGENT_GUIDANCE.md` from the root of the scan directory and includes it in the manifest. This keeps your guidance in version control alongside the tool files it references.
 
 ### Tips for Writing Guidance
 
@@ -734,7 +728,7 @@ For complex schemas, you can provide concrete examples of valid parameter object
 ```tsx
 create_report: {
   description: 'Create a new report with filters',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   dataSchema: {
     type: 'object',
     properties: {
@@ -758,6 +752,6 @@ create_report: {
 ## Learn More
 
 - [Pillar SDK Documentation](https://trypillar.com/docs)
-- [Tools Guide](https://trypillar.com/docs/guides/actions)
+- [Tools Guide](https://trypillar.com/docs/guides/tools)
 - [Context API](https://trypillar.com/docs/guides/context)
 - [Custom Cards](https://trypillar.com/docs/guides/custom-cards)
