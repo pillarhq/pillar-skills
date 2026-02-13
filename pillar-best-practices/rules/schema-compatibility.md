@@ -1,12 +1,12 @@
 # schema-compatibility
 
-Action `dataSchema` definitions are converted into LLM tool parameter schemas. Pillar routes tool calls to multiple providers (OpenAI, Anthropic, Google Gemini via OpenRouter), and each provider validates schemas differently. Gemini is the strictest. Follow these rules so your schemas work across all providers.
+Tool `inputSchema` definitions are converted into LLM tool parameter schemas. Pillar routes tool calls to multiple providers (OpenAI, Anthropic, Google Gemini via OpenRouter), and each provider validates schemas differently. Gemini is the strictest. Follow these rules so your schemas work across all providers.
 
 ## Rules
 
 ### 1. Arrays must have `items`
 
-Every `type: 'array'` property must include an `items` definition specifying the element type. Gemini rejects arrays without `items`.
+Every `type: 'array'` property must include an `items` definition specifying the element type. Gemini rejects arrays without `items`. This is the #1 cause of Gemini rejections. Always add items.
 
 ```tsx
 // Bad - Gemini returns "items: missing field"
@@ -69,7 +69,7 @@ Every entry in a `required` array must correspond to a key defined in `propertie
 
 ## Quick checklist
 
-Before syncing actions:
+Before syncing tools:
 
 - [ ] Every `type: 'array'` has an `items` field
 - [ ] Every `type` value is a single string, not an array

@@ -13,8 +13,9 @@ Reference these guidelines when:
 
 - Adding Pillar SDK to a React or Next.js project
 - Setting up `PillarProvider` in your app
-- Defining actions for the AI assistant to suggest
-- Creating action handlers to execute user requests
+- Defining tools for the AI assistant to discover and call
+- Creating tool handlers to execute user requests
+- Designing multi-tool workflows for agentic operations
 
 ## Essential Rules
 
@@ -22,9 +23,13 @@ Reference these guidelines when:
 |----------|------|-------------|
 | CRITICAL | `setup-provider` | Always wrap your app with PillarProvider |
 | CRITICAL | `setup-nextjs` | Next.js App Router requires a 'use client' wrapper |
-| CRITICAL | `schema-compatibility` | dataSchema must follow cross-model formatting rules (arrays need items, no type unions) |
-| HIGH | `action-descriptions` | Write specific, AI-matchable descriptions and keep actions focused |
-| HIGH | `action-handlers` | Use centralized handlers with proper cleanup |
+| CRITICAL | `schema-compatibility` | inputSchema must follow cross-model formatting rules (arrays need items, no type unions) |
+| HIGH | `tool-descriptions` | Write specific, AI-matchable descriptions and keep tools focused |
+| HIGH | `tool-handlers` | Use centralized handlers with proper cleanup |
+| HIGH | `guidance-field` | Use the guidance field for agent-facing disambiguation and prerequisites |
+| HIGH | `workflow-patterns` | Design multi-tool workflows using the distributed guidance pattern |
+| HIGH | `tool-overlap-audit` | Audit existing tools for overlap before creating new ones |
+| HIGH | `codebase-verification` | Verify API shapes against the actual codebase -- never guess |
 
 ## Quick Reference
 
@@ -59,7 +64,7 @@ export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### 3. Action Descriptions (HIGH)
+### 3. Tool Descriptions (HIGH)
 
 Write specific descriptions the AI can match:
 
@@ -71,61 +76,58 @@ description: 'Navigate to billing settings. Suggest when user asks about payment
 description: 'Go to billing'
 ```
 
-Add example phrases:
+### 4. defineTool() — Preferred API (HIGH)
+
+Use `pillar.defineTool()` for new code — it co-locates definition + handler and supports `guidance`:
 
 ```tsx
-examples: [
-  'how do I update my payment method?',
-  'where can I see my invoices?',
-  'change my subscription',
-]
+pillar.defineTool({
+  name: 'create_dashboard',
+  description: 'Create a new empty dashboard.',
+  guidance: 'First step in dashboard workflow. Returns dashboard_uid needed by create_*_panel tools.',
+  type: 'trigger_action',
+  autoRun: true,
+  inputSchema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
+  execute: async (data) => {
+    const result = await api.createDashboard(data.title);
+    return { success: true, data: { uid: result.uid } };
+  },
+});
 ```
 
-### 4. Action Handlers (HIGH)
+Sync with: `npx pillar-sync --scan ./src/actions`
 
-Use a centralized handler component with cleanup:
+### 5. Guidance Field (HIGH)
+
+Use `guidance` for agent-facing instructions that help the LLM choose and chain tools:
 
 ```tsx
-'use client';
-
-import { usePillar } from '@pillar-ai/react';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-
-export function PillarActionHandlers() {
-  const { pillar } = usePillar();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!pillar) return;
-    
-    const handlers = [
-      pillar.onTask('navigate', ({ path }) => {
-        router.push(path);
-        return { success: true };
-      }),
-    ];
-    
-    return () => handlers.forEach(unsub => unsub?.());
-  }, [pillar, router]);
-
-  return null;
+get_available_datasources: {
+  description: 'Get datasources available for creating visualizations.',
+  guidance: 'Call BEFORE creating dashboards or panels. If zero results, ask user to create one.',
 }
 ```
 
-### 5. Decompose Large Actions (HIGH)
+### 6. Audit for Overlap (HIGH)
 
-Prefer smaller actions with tight schemas over one large action with many modes:
+Before creating a new tool, search existing tools for semantic overlap:
+
+```tsx
+// Found existing: save_dashboard handles "create a dashboard"
+// Don't create a second create_dashboard -- extend or disambiguate instead
+```
+
+### 7. Decompose Large Tools (HIGH)
+
+Prefer smaller tools with tight schemas over one large tool with many modes:
 
 ```tsx
 // Instead of one "manage_user" with an operation enum,
-// split into focused actions:
+// split into focused tools:
 invite_user: { description: 'Invite a new user by email', type: 'trigger_action' }
 remove_user: { description: 'Remove a user from the org', type: 'trigger_action' }
 change_user_role: { description: 'Change a user role', type: 'trigger_action' }
 ```
-
-Your `dataSchema` becomes the tool parameter schema in the AI's tool-calling API, so tight schemas produce more reliable tool calls.
 
 ## How to Use
 
@@ -134,9 +136,11 @@ Read individual rule files for detailed explanations and code examples:
 ```
 rules/setup-provider.md
 rules/setup-nextjs.md
-rules/action-descriptions.md
-rules/action-handlers.md
+rules/tool-descriptions.md
+rules/tool-handlers.md
 rules/schema-compatibility.md
+rules/guidance-field.md
+rules/workflow-patterns.md
+rules/tool-overlap-audit.md
+rules/codebase-verification.md
 ```
-
-For the complete guide with all patterns expanded: `AGENTS.md`

@@ -56,7 +56,7 @@ function App() {
 | `config` | `object` | Configuration for panel, theme, triggers |
 | `onReady` | `() => void` | Callback when SDK is initialized |
 | `onError` | `(error: Error) => void` | Callback for initialization errors |
-| `cards` | `object` | Custom card components for inline_ui actions |
+| `cards` | `object` | Custom card components for inline_ui tools |
 
 ## Environment Variables
 

@@ -1,15 +1,15 @@
 # Pillar SDK Complete Reference
 
-This is the complete reference for integrating the Pillar SDK. It covers installation, configuration, actions, handlers, and advanced features.
+This is the complete reference for integrating the Pillar SDK. It covers installation, configuration, tools, handlers, and advanced features.
 
 ## Overview
 
-Pillar SDK provides an AI-powered assistant panel for your application. Users can ask questions, and the AI can suggest actions that execute directly in your app.
+Pillar SDK provides an AI-powered assistant panel for your application. Users can ask questions, and the AI can suggest tools that execute directly in your app.
 
 **What you'll build:**
 - A slide-out assistant panel with AI chat
 - A sidebar trigger (or custom button) that opens the panel
-- Actions the AI can suggest to users
+- Tools the AI can suggest to users
 
 ## Installation
 
@@ -119,14 +119,14 @@ All configuration is optional with sensible defaults:
 />
 ```
 
-## Defining Actions
+## Defining Tools
 
-Actions are things users can do in your app that the AI can suggest.
+Tools are things users can do in your app that the AI can suggest.
 
-### Basic Action Definition
+### Basic Tool Definition
 
 ```tsx
-// lib/pillar/actions.ts
+// lib/pillar/tools.ts
 import { defineActions } from '@pillar-ai/sdk';
 
 export const actions = defineActions({
@@ -149,7 +149,7 @@ export const actions = defineActions({
 });
 ```
 
-### Action Types
+### Tool Types
 
 | Type | Description | Use Case |
 |------|-------------|----------|
@@ -162,7 +162,7 @@ export const actions = defineActions({
 
 ### Writing Good Descriptions
 
-The AI matches user queries to your action descriptions. Be specific:
+The AI matches user queries to your tool descriptions. Be specific:
 
 ```tsx
 // Good - specific about when to use
@@ -210,21 +210,88 @@ add_source: {
 }
 ```
 
-## Action Handlers
+## defineTool() — Preferred API
+
+For new code, use `pillar.defineTool()` to co-locate the tool definition and handler in one call. This is the recommended pattern — it prevents drift between definition and handler, and the `guidance` field is extracted automatically by `pillar-sync --scan`.
+
+```tsx
+// actions/dashboardCrud.ts
+import type { PillarInstance } from './types';
+
+export function registerDashboardTools(pillar: PillarInstance): Array<() => void> {
+  return [
+    pillar.defineTool({
+      name: 'create_dashboard',
+      description: 'Create a new empty dashboard, returning its UID for panel creation.',
+      guidance:
+        'First step in any dashboard workflow. Returns dashboard_uid needed by all create_*_panel tools.',
+      type: 'trigger_action',
+      autoRun: true,
+      autoComplete: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Dashboard title' },
+        },
+        required: ['title'],
+      },
+      execute: async (data: { title: string }) => {
+        const response = await api.createDashboard(data.title);
+        return { success: true, data: { uid: response.uid } };
+      },
+    }),
+  ];
+}
+```
+
+Key differences from `defineActions` + `onTask()`:
+- Handler is co-located with the definition (`execute` field)
+- Returns an unsubscribe function for cleanup
+- `guidance` field is supported and synced via `--scan`
+- All `defineTool` tools automatically return data to the agent
+
+### When to use which
+
+| Pattern | Use when | Sync method |
+|---------|----------|-------------|
+| `defineTool()` | New code, any tool | `pillar-sync --scan ./src` |
+| `defineActions` + `onTask()` | Existing codebases not yet migrated | `pillar-sync --scan ./src` |
+
+## Tool Syncing
+
+### Automatic scanning (recommended)
+
+```bash
+PILLAR_SLUG=my-app PILLAR_SECRET=xxx npx pillar-sync --scan ./src/actions
+```
+
+The scanner uses the TypeScript compiler API to statically extract metadata from `defineTool()` and `defineActions()` calls. It extracts: `name`, `description`, `guidance`, `type`, `inputSchema`, `examples`, `autoRun`, `autoComplete`.
+
+No barrel file or manifest needed. The scanner finds all tool definitions recursively.
+
+### What the scanner cannot extract
+
+- `execute` functions (runtime only)
+- Variable references (must be inline literals)
+- Computed values
+
+If a field can't be resolved statically, the scanner skips it with a warning.
+
+## Tool Handlers (Legacy Pattern)
 
 ### Centralized Handler Pattern
 
 Create a dedicated component for all your handlers:
 
 ```tsx
-// components/PillarActionHandlers.tsx
+// components/PillarToolHandlers.tsx
 'use client';
 
 import { usePillar } from '@pillar-ai/react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-export function PillarActionHandlers() {
+export function PillarToolHandlers() {
   const { pillar } = usePillar();
   const router = useRouter();
 
@@ -255,7 +322,7 @@ Include it in your layout:
 ```tsx
 // app/layout.tsx
 <PillarSDKProvider>
-  <PillarActionHandlers />
+  <PillarToolHandlers />
   {children}
 </PillarSDKProvider>
 ```
@@ -275,7 +342,7 @@ return { success: false, message: 'Something went wrong' };
 
 ### Built-in Handlers
 
-Pillar provides fallback handlers for common action types:
+Pillar provides fallback handlers for common tool types:
 
 | Type | Default Behavior |
 |------|------------------|
@@ -346,14 +413,14 @@ function RouteContextSync() {
 |----------|------|-------------|
 | `currentPage` | `string` | Current URL path |
 | `currentFeature` | `string` | Human-readable feature name |
-| `userRole` | `string` | User's role for action filtering |
+| `userRole` | `string` | User's role for tool filtering |
 | `userState` | `string` | User's current state (onboarding, trial, active) |
 | `errorState` | `object` | Current error with code and message |
 | `custom` | `object` | Any additional context data |
 
-### Action Filtering with Context
+### Tool Filtering with Context
 
-Use `requiredContext` to control which actions the AI suggests:
+Use `requiredContext` to control which tools the AI suggests:
 
 ```tsx
 delete_user: {
@@ -365,7 +432,7 @@ delete_user: {
 
 ## Plans (Automatic)
 
-The AI automatically creates multi-step plans when a user's request requires multiple actions. Your handlers work the same way - no special code needed.
+The AI automatically creates multi-step plans when a user's request requires multiple tools. Your handlers work the same way - no special code needed.
 
 **Example:** When a user asks "Help me set up my workspace", the AI might create a plan:
 1. Create a new project
@@ -373,14 +440,14 @@ The AI automatically creates multi-step plans when a user's request requires mul
 3. Configure the assistant
 4. Invite your team
 
-Each step executes your registered action handlers automatically.
+Each step executes your registered tool handlers automatically.
 
 ## Custom Cards (Advanced)
 
-For `inline_ui` actions, you can render custom React components in the chat:
+For `inline_ui` tools, you can render custom React components in the chat:
 
 ```tsx
-// Define the action
+// Define the tool
 show_product: {
   type: 'inline_ui',
   description: 'Show a product preview card',
@@ -406,17 +473,17 @@ NEXT_PUBLIC_PILLAR_PRODUCT_KEY=your-product-key
 
 ## TypeScript Support
 
-Both packages include TypeScript definitions. Get full type inference for your actions:
+Both packages include TypeScript definitions. Get full type inference for your tools:
 
 ```tsx
 import { usePillar } from '@pillar-ai/react';
-import type { actions } from '@/lib/pillar/actions';
+import type { actions } from '@/lib/pillar/tools';
 
-function ActionHandlers() {
+function ToolHandlers() {
   const { onTask } = usePillar<typeof actions>();
 
   useEffect(() => {
-    // TypeScript knows the data shape for each action
+    // TypeScript knows the data shape for each tool
     onTask('invite_member', (data) => {
       console.log(data.email); // Typed!
     });
@@ -444,14 +511,14 @@ export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// components/PillarActionHandlers.tsx
+// components/PillarToolHandlers.tsx
 'use client';
 
 import { usePillar } from '@pillar-ai/react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-export function PillarActionHandlers() {
+export function PillarToolHandlers() {
   const { pillar } = usePillar();
   const router = useRouter();
 
@@ -471,14 +538,14 @@ export function PillarActionHandlers() {
 
 // app/layout.tsx
 import { PillarSDKProvider } from '@/providers/PillarSDKProvider';
-import { PillarActionHandlers } from '@/components/PillarActionHandlers';
+import { PillarToolHandlers } from '@/components/PillarToolHandlers';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
         <PillarSDKProvider>
-          <PillarActionHandlers />
+          <PillarToolHandlers />
           {children}
         </PillarSDKProvider>
       </body>
@@ -487,9 +554,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-## Action Decomposition
+## Tool Decomposition
 
-When an API or feature has many modes, don't model it as one action with a large schema and conditional fields. Split it into smaller actions that each do one thing.
+When an API or feature has many modes, don't model it as one tool with a large schema and conditional fields. Split it into smaller tools that each do one thing.
 
 ### Why
 
@@ -503,7 +570,7 @@ Smaller schemas mean the AI fills in fewer fields, picks the right tool more oft
 ### Pattern
 
 ```tsx
-// Before: one action with an operation switch
+// Before: one tool with an operation switch
 manage_report: {
   description: 'Create, schedule, or export a report',
   type: 'trigger_action',
@@ -519,7 +586,7 @@ manage_report: {
   },
 }
 
-// After: three actions, each with only the fields it needs
+// After: three tools, each with only the fields it needs
 create_report: {
   description: 'Create a new report with filters',
   type: 'trigger_action',
@@ -564,135 +631,30 @@ The handlers can share internal logic. The point is that the AI sees three clear
 
 ### When to Split
 
-Split when an action has:
+Split when a tool has:
 - An "operation" or "mode" field that changes which other fields are required
 - More than 5-6 properties in the schema
 - Conditional required fields (field X is required only when field Y is "foo")
-- Multiple distinct user intents mapping to one action name
+- Multiple distinct user intents mapping to one tool name
 
-Keep it as one action when:
+Keep it as one tool when:
 - All fields are always relevant regardless of input
-- The action is simple (1-3 properties)
-- Splitting would create nearly identical actions
+- The tool is simple (1-3 properties)
+- Splitting would create nearly identical tools
 
-### Verification Loop Pattern
+## How Tools Work
 
-For actions that create or modify resources via API, add a companion query action that validates input before committing. Without this, the agent creates broken configurations and has no way to detect or fix them.
+When the agent finds your tools via search, they are registered as native tools in the LLM's tool-calling API. This means:
 
-The pattern:
-
-1. A `test_*` or `preview_*` query action that validates the input and returns sample data
-2. A `create_*` action with `returns: true` that commits the change
-3. Agent guidance that tells the AI to always test before creating
-
-```tsx
-// Step 1: Query action -- agent validates the data first
-test_chart_query: {
-  description: 'Test a chart query and return sample results',
-  type: 'query',
-  guidance: 'Use this before any create_*_chart action to verify the query returns data.',
-  dataSchema: {
-    type: 'object',
-    properties: {
-      datasource: { type: 'object', properties: { id: { type: 'number' }, type: { type: 'string' } }, required: ['id', 'type'] },
-      queries: { type: 'array', items: { type: 'object', properties: { columns: { type: 'array', items: { type: 'object' } }, metrics: { type: 'array', items: { type: 'object' } } }, required: ['columns', 'metrics'] } },
-    },
-    required: ['datasource', 'queries'],
-  },
-  autoRun: true,
-  autoComplete: true,
-}
-
-// Step 2: Creation action -- only called after query is verified
-create_bar_chart: {
-  description: 'Create a bar chart via API with full configuration',
-  type: 'trigger_action',
-  returns: true,
-  guidance: 'Always test the query with test_chart_query first. Only create after it returns valid data.',
-  dataSchema: { /* tight schema for bar chart params */ },
-  autoRun: true,
-  autoComplete: true,
-}
-```
-
-This is the pattern used in the Superset copilot (`test_chart_query` -> `create_bar_chart`) and Grafana copilot (`test_datasource_query` -> `create_timeseries_panel`). The agent guidance then encodes the workflow:
-
-```tsx
-export const agentGuidance = `
-VERIFY BEFORE COMMITTING:
-When creating visualizations, always test the query against the data source first.
-If it returns data, proceed with creating the visualization.
-If it returns no data or errors, adjust the query and re-test.
-Never create a visualization with an unverified query.
-`;
-```
-
-### Reusable Schema Components
-
-When multiple actions share the same schema shapes (metrics, filters, columns), define them as shared objects and reference them across actions. This keeps schemas consistent and reduces duplication.
-
-```tsx
-// Shared schema components
-const metricSchema = {
-  type: 'object',
-  description: 'Metric object for aggregation',
-  properties: {
-    expressionType: { type: 'string', enum: ['SQL', 'SIMPLE'] },
-    sqlExpression: { type: 'string', description: 'SQL expression like "SUM(amount)"' },
-    label: { type: 'string', description: 'Display label for the metric' },
-  },
-  required: ['expressionType', 'label'],
-};
-
-const filterSchema = {
-  type: 'object',
-  properties: {
-    column: { type: 'string', description: 'Column name to filter' },
-    operator: { type: 'string', description: 'Comparison operator' },
-    value: { type: 'string', description: 'Filter value' },
-  },
-  required: ['column', 'operator', 'value'],
-};
-
-// Used in multiple actions
-create_bar_chart: {
-  dataSchema: {
-    type: 'object',
-    properties: {
-      metrics: { type: 'array', items: metricSchema },
-      filters: { type: 'array', items: filterSchema },
-      // ...
-    },
-  },
-}
-
-create_line_chart: {
-  dataSchema: {
-    type: 'object',
-    properties: {
-      metrics: { type: 'array', items: metricSchema },  // same schema
-      filters: { type: 'array', items: filterSchema },  // same schema
-      // ...
-    },
-  },
-}
-```
-
-This pattern is used in the Superset copilot where `metricSchema`, `adhocFilterSchema`, and `xAxisColumnSchema` are shared across all chart creation actions.
-
-## How Actions Become Tools
-
-When the agent finds your actions via search, they are registered as native tools in the LLM's tool-calling API. This means:
-
-1. Your action's `description` becomes the tool description
-2. Your action's `dataSchema` becomes the tool's `parameters` JSON Schema
+1. Your tool's `description` becomes the tool description
+2. Your tool's `dataSchema` becomes the tool's `parameters` JSON Schema
 3. The AI calls the tool by name with structured arguments matching your schema
 4. The SDK executes your handler with those arguments and returns the result
 
 This is why `dataSchema` quality matters so much. The schema _is_ the tool definition the model sees.
 
 ```
-Client defines action          Server converts to tool         AI calls tool
+Client defines tool            Server registers tool           AI calls tool
 +------------------+          +---------------------+         +-----------------+
 | name: invite_user|   sync   | name: invite_user   |  call   | invite_user({   |
 | description: ... | -------> | description: ...    | ------> |   email: "...", |
@@ -702,7 +664,7 @@ Client defines action          Server converts to tool         AI calls tool
 +------------------+          +---------------------+         +-----------------+
 ```
 
-Actions with `returns: true` (or `type: 'query'`) send the handler's return value back to the agent for further reasoning.
+Tools with `returns: true` (or `type: 'query'`) send the handler's return value back to the agent for further reasoning.
 
 ## Schema Compatibility
 
@@ -717,7 +679,7 @@ See `rules/schema-compatibility.md` for the full rules, examples, and a review c
 
 ## Agent Guidance
 
-Agent Guidance is custom instructions injected into the AI agent's prompt at runtime. Use it to tell the agent how to choose between actions, describe multi-step workflows, and provide domain knowledge.
+Agent Guidance is custom instructions injected into the AI agent's prompt at runtime. Use it to tell the agent how to choose between tools, describe multi-step workflows, and provide domain knowledge.
 
 ### Two Ways to Configure
 
@@ -728,72 +690,46 @@ Agent Guidance is custom instructions injected into the AI agent's prompt at run
 3. Enter instructions in the **Agent Guidance** textarea
 4. Save changes
 
-**2. Code sync via `agentGuidance` export** (deployed with your actions):
+**2. Code sync via `agentGuidance` export** (deployed with your tools):
 
-Export an `agentGuidance` string alongside your actions. `pillar-sync` sends it to the backend automatically:
+Export an `agentGuidance` string alongside your tools. `pillar-sync` sends it to the backend automatically:
 
 ```tsx
-// lib/pillar/actions/index.ts
+// lib/pillar/tools/index.ts
 export const actions = { /* ... */ };
 
 export const agentGuidance = `
-PREFER API OVER NAVIGATION:
-- When you can accomplish a task via API, prefer that over navigating to a form
-- API actions execute instantly and return structured results
-- Only navigate when no API alternative exists
+PREFER API TOOLS OVER NAVIGATION:
+- When both an API tool and a navigation tool can accomplish a task, prefer the API tool
+- API tools execute instantly; navigation requires user to complete forms manually
 
-ORDER FULFILLMENT:
+ORDER FULFILLMENT WORKFLOW:
 When a user asks to process an order:
-1. Look up the order details first
-2. Verify inventory is available
-3. Generate the shipment
-4. Notify the customer when complete
+1. Use get_order to fetch order details
+2. Use validate_inventory to check stock
+3. Use create_shipment to generate shipping label
+4. Use notify_customer to send confirmation
 `;
 ```
 
 Then sync:
 
 ```bash
-PILLAR_SLUG=your-product PILLAR_SECRET=xxx npx pillar-sync --actions ./lib/pillar/actions/index.ts
+PILLAR_SLUG=your-product PILLAR_SECRET=xxx npx pillar-sync --scan ./lib/pillar/tools
 ```
 
-The code-sync path is useful when your guidance references specific action names and should stay in version control alongside those actions.
+The code-sync path is useful when your guidance references specific tool names and should stay in version control alongside those tools.
 
 ### Tips for Writing Guidance
 
-1. Tell the agent what to prefer and when, referencing exact action names
+1. Tell the agent what to prefer and when, referencing exact tool names
 2. Describe multi-step workflows as numbered sequences
-3. Include verification steps where relevant ("test first, then create")
-4. Keep it focused on common requests (not an exhaustive manual)
-5. Update as you add or rename actions
-
-### Verification Workflow Example
-
-For copilots that create resources via API, agent guidance should encode the verify-then-commit loop:
-
-```tsx
-export const agentGuidance = `
-PREFER API OVER NAVIGATION:
-- API actions execute instantly and return structured results
-- Navigation requires the user to fill out forms manually
-- Only navigate when no API alternative exists
-
-CREATING VISUALIZATIONS:
-When building charts or dashboards:
-1. First discover what data sources are available
-2. Inspect the data to understand columns and types
-3. Test the query to confirm it returns data before creating anything
-4. If the test fails, adjust the query and re-test
-5. Only create the visualization after validation succeeds
-6. Show the user the result when done
-`;
-```
-
-This ensures the agent validates before committing. The same pattern applies to any create workflow: test first, then commit.
+3. Keep it focused on common requests (not an exhaustive manual)
+4. Update as you add or rename tools
 
 ## Parameter Examples (Advanced)
 
-For complex schemas, you can provide concrete examples of valid parameter objects. These are stored alongside the action and shown to the AI when it needs to fill in the schema.
+For complex schemas, you can provide concrete examples of valid parameter objects. These are stored alongside the tool and shown to the AI when it needs to fill in the schema.
 
 ```tsx
 create_report: {
@@ -822,6 +758,6 @@ create_report: {
 ## Learn More
 
 - [Pillar SDK Documentation](https://trypillar.com/docs)
-- [Actions Guide](https://trypillar.com/docs/guides/actions)
+- [Tools Guide](https://trypillar.com/docs/guides/actions)
 - [Context API](https://trypillar.com/docs/guides/context)
 - [Custom Cards](https://trypillar.com/docs/guides/custom-cards)
