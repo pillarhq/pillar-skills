@@ -124,7 +124,7 @@ See `rules/guidance-field.md` for full details on when and how to use guidance.
 
 ## Handler Return Values
 
-What your `execute` function returns is what the agent sees. Return flat, JSON-serializable data directly.
+What your `execute` function returns is what the agent sees. Return flat, JSON-serializable data directly. Throw an `Error` on failure.
 
 ```tsx
 // Return flat data — the agent receives this object
