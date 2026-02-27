@@ -52,7 +52,7 @@ invite_member: {
     'share access with someone',
     'invite a colleague',
   ],
-  type: 'trigger_action',
+  type: 'trigger_tool',
 }
 ```
 
@@ -102,7 +102,7 @@ If one tool would need a huge schema or many conditional modes, split it into sm
 // Too broad - one tool trying to handle everything
 manage_user: {
   description: 'Manage users in the organization',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   inputSchema: {
     type: 'object',
     properties: {
@@ -117,7 +117,7 @@ manage_user: {
 // Better - one tool per operation, each with only the fields it needs
 invite_user: {
   description: 'Invite a new user to the organization by email',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   inputSchema: {
     type: 'object',
     properties: {
@@ -130,7 +130,7 @@ invite_user: {
 
 remove_user: {
   description: 'Remove a user from the organization',
-  type: 'trigger_action',
+  type: 'trigger_tool',
   inputSchema: {
     type: 'object',
     properties: {
@@ -164,6 +164,6 @@ Schemas must also follow cross-model formatting rules. Pillar routes to multiple
     'natural phrase 2',
     'question form',
   ],
-  type: 'navigate' | 'trigger_action' | 'inline_ui',
+  type: 'navigate' | 'trigger_tool' | 'inline_ui',
 }
 ```

@@ -121,13 +121,22 @@ All configuration is optional with sensible defaults:
 
 ## Defining Tools
 
-Tools are things users can do in your app that the AI can suggest.
+Tools are things users can do in your app that the AI can suggest. There are two ways to register them:
 
-### Basic Tool Definition
+| API | Best for | Where |
+|-----|----------|-------|
+| `usePillarTool()` | React components — auto-registers on mount, unregisters on unmount | `@pillar-ai/react` |
+| `pillar.defineTool()` | Non-React code, or imperative registration outside the component tree | `@pillar-ai/sdk` |
+
+Both accept the same `ToolSchema` shape (name, description, inputSchema, execute, etc.).
+
+### usePillarTool (React Hook)
+
+The recommended way to register tools in React components. Handles cleanup automatically and uses refs internally so your `execute` handler always captures the latest state/props (no stale closures).
 
 ```tsx
-// lib/pillar/tools.ts
-import { PillarProvider, usePillarTool } from '@pillar-ai/react';
+import { usePillarTool } from '@pillar-ai/react';
+import { useRouter } from 'next/navigation';
 
 function useAppTools() {
   const router = useRouter();
@@ -139,19 +148,33 @@ function useAppTools() {
     autoRun: true,
     execute: () => router.push('/settings'),
   });
-
-  usePillarTool({
-    name: 'invite_member',
-    description: 'Open the invite team member modal',
-    examples: [
-      'invite someone to my team',
-      'add a new user',
-      'how do I invite people?',
-    ],
-    type: 'trigger_tool',
-    execute: () => openInviteModal(),
-  });
 }
+```
+
+Register multiple tools at once by passing an array:
+
+```tsx
+usePillarTool([
+  {
+    name: 'get_current_plan',
+    description: 'Get the current billing plan',
+    type: 'query',
+    execute: async () => ({ plan: 'pro', price: 29 }),
+  },
+  {
+    name: 'upgrade_plan',
+    description: 'Upgrade to a higher plan',
+    type: 'trigger_tool',
+    inputSchema: {
+      type: 'object',
+      properties: { planId: { type: 'string' } },
+      required: ['planId'],
+    },
+    execute: async ({ planId }) => {
+      await billingApi.upgrade(planId);
+    },
+  },
+]);
 ```
 
 ### Tool Types
@@ -160,7 +183,7 @@ function useAppTools() {
 |------|-------------|----------|
 | `navigate` | Navigate to a page in your app | Settings, dashboard, detail pages |
 | `trigger_tool` | Run custom logic | Open modals, start wizards, toggle features |
-| `query` | Fetch data and return to the agent | List items, get details, lookups (auto-sets `returns: true`) |
+| `query` | Fetch data and return to the agent | List items, get details, lookups |
 | `inline_ui` | Show interactive UI in chat | Forms, confirmations, previews |
 | `external_link` | Open URL in new tab | Documentation, external resources |
 | `copy_text` | Copy text to clipboard | API keys, code snippets |
@@ -198,7 +221,7 @@ Define a schema to have the AI extract structured data from user messages:
 add_source: {
   description: 'Add a new knowledge source',
   type: 'trigger_tool',
-  dataSchema: {
+  inputSchema: {
     type: 'object',
     properties: {
       url: {
@@ -242,18 +265,21 @@ export function registerDashboardTools(pillar: PillarInstance): Array<() => void
       },
       execute: async (data: { title: string }) => {
         const response = await api.createDashboard(data.title);
-        return { success: true, data: { uid: response.uid } };
+        return { uid: response.uid };
       },
     }),
   ];
 }
 ```
 
-Key properties of `defineTool()`:
+Key properties of `defineTool()` and `usePillarTool()`:
 - Handler is co-located with the definition (`execute` field)
-- Returns an unsubscribe function for cleanup
+- `defineTool()` returns an unsubscribe function for cleanup; `usePillarTool()` handles cleanup automatically on unmount
 - `guidance` field is supported and synced via `--scan`
-- All `defineTool` tools automatically return data to the agent
+- All tools registered this way automatically return data to the agent
+- `autoRun` (default: false) — execute without user confirmation
+- `autoComplete` (default: true) — complete immediately after execution. Set to false for long-running tools where you want to call `pillar.completeTask(id, success)` manually
+- `outputSchema` — JSON Schema describing the tool's return value. Properties with `"sensitive": true` are stripped from AI context and delivered to the user via a secure reveal UI
 
 ## Tool Syncing
 
@@ -299,12 +325,10 @@ export function PillarToolHandlers() {
     const handlers = [
       pillar.onTask('navigate', ({ path }) => {
         router.push(path);
-        return { success: true };
       }),
 
       pillar.onTask('invite_member', ({ email, role }) => {
         openInviteModal({ email, role });
-        return { success: true };
       }),
     ];
 
@@ -327,16 +351,56 @@ Include it in your layout:
 
 ### Handler Return Values
 
+What your `execute` function returns is what the agent sees as the tool result. The SDK normalizes it, so follow these rules:
+
+**Return flat data (recommended):**
+
 ```tsx
-// Success
-return { success: true };
-
-// Success with message
-return { success: true, message: 'Invite sent!' };
-
-// Failure
-return { success: false, message: 'Something went wrong' };
+// The agent receives exactly this object
+execute: async ({ status, minAmount }) => {
+  const expenses = await api.listExpenses({ status, minAmount });
+  return { expenses, total: expenses.length };
+}
 ```
+
+**Legacy envelope (still supported):**
+
+```tsx
+// SDK unwraps { success: true, data: X } → agent sees X
+return { success: true, data: { expenses, total: expenses.length } };
+```
+
+**Side-effect only (no data for the agent):**
+
+```tsx
+// Return nothing — used for navigate, trigger_tool, etc.
+execute: ({ path }) => { router.push(path); }
+```
+
+**Errors:**
+
+```tsx
+// Throw an error — SDK catches it and sends { success: false, error: "..." } to the agent
+throw new Error('Expense not found');
+```
+
+**Common mistake — returning `{ success: true }` without data:**
+
+```tsx
+// BAD: agent only sees { success: true } — the actual data is lost
+execute: async (params) => {
+  const result = await api.listExpenses(params);
+  return { success: true };
+}
+
+// GOOD: return the data directly
+execute: async (params) => {
+  const result = await api.listExpenses(params);
+  return { expenses: result.items, total: result.total };
+}
+```
+
+The normalizer only unwraps the `data` key from `{ success, data }` envelopes. Any other nesting (e.g., `{ success: true, result: {...} }` or `{ success: true, content: [...] }`) passes through as-is, which means the agent sees `success: true` alongside your nested key rather than just the data.
 
 ### Built-in Handlers
 
@@ -370,18 +434,55 @@ function MyComponent() {
 }
 ```
 
+The `open()` function accepts an options argument to open to a specific view:
+
+```tsx
+open()                              // Open panel (default view)
+open({ view: 'chat' })              // Open directly to chat
+open({ view: 'search' })            // Open to search
+open({ article: 'getting-started' }) // Open a specific article
+open({ search: 'billing' })         // Open with a pre-filled search query
+open({ focusInput: true })           // Open and focus the input field
+```
+
 ### useHelpPanel
 
-Simplified panel controls:
+Panel-specific controls with convenience methods for common navigation:
 
 ```tsx
 import { useHelpPanel } from '@pillar-ai/react';
 
 function HelpButton() {
-  const { open, isOpen } = useHelpPanel();
+  const { isOpen, open, close, toggle, openArticle, openCategory, openSearch, openChat } = useHelpPanel();
 
-  return <button onClick={open}>Get Help</button>;
+  return (
+    <div>
+      <button onClick={toggle}>{isOpen ? 'Close' : 'Help'}</button>
+      <button onClick={openChat}>Ask AI</button>
+      <button onClick={() => openArticle('getting-started')}>Guide</button>
+      <button onClick={() => openSearch('billing')}>Search billing</button>
+    </div>
+  );
 }
+```
+
+### PillarPanel
+
+For custom panel placement (e.g., embedding the panel inside your layout instead of as a sidebar), use the `PillarPanel` component with `panel.container: 'manual'`:
+
+```tsx
+import { PillarProvider, PillarPanel } from '@pillar-ai/react';
+
+<PillarProvider
+  productKey="your-product-key"
+  config={{ panel: { container: 'manual' } }}
+>
+  <div className="my-layout">
+    <Sidebar />
+    <PillarPanel className="help-panel-container" />
+    <MainContent />
+  </div>
+</PillarProvider>
 ```
 
 ## Context API (Enhancement)
@@ -427,6 +528,39 @@ delete_user: {
   requiredContext: { userRole: 'admin' },
 }
 ```
+
+## User Identification
+
+Identify the current user so the AI can personalize responses and the dashboard can track usage per user:
+
+```tsx
+import { usePillar } from '@pillar-ai/react';
+
+function AuthSync() {
+  const { pillar } = usePillar();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!pillar || !user) return;
+
+    pillar.identify(user.id, {
+      name: user.name,
+      email: user.email,
+    });
+
+    return () => {
+      pillar.logout();
+    };
+  }, [pillar, user]);
+
+  return null;
+}
+```
+
+Available methods:
+- `identify(userId, profile?)` — Associate a user with the session. Profile fields: `name`, `email`, and any custom properties.
+- `setUserProfile(profile)` — Update profile data after initial identification.
+- `logout(options?)` — Clear user identity. Pass `{ preserveConversation: true }` to keep chat history.
 
 ## Plans (Automatic)
 
@@ -525,7 +659,6 @@ export function PillarToolHandlers() {
     const handlers = [
       pillar.onTask('navigate', ({ path }) => {
         router.push(path);
-        return { success: true };
       }),
     ];
     return () => handlers.forEach(unsub => unsub?.());
@@ -558,7 +691,7 @@ When an API or feature has many modes, don't model it as one tool with a large s
 
 ### Why
 
-Your `dataSchema` is converted directly into the AI tool's parameter schema. Large schemas with optional/conditional fields cause:
+Your `inputSchema` is converted directly into the AI tool's parameter schema. Large schemas with optional/conditional fields cause:
 - The AI guessing at fields it doesn't need
 - Ambiguous intent matching (which mode did the user mean?)
 - Harder debugging when a tool call fails
@@ -572,7 +705,7 @@ Smaller schemas mean the AI fills in fewer fields, picks the right tool more oft
 manage_report: {
   description: 'Create, schedule, or export a report',
   type: 'trigger_tool',
-  dataSchema: {
+  inputSchema: {
     type: 'object',
     properties: {
       operation: { type: 'string', enum: ['create', 'schedule', 'export'] },
@@ -588,7 +721,7 @@ manage_report: {
 create_report: {
   description: 'Create a new report with filters',
   type: 'trigger_tool',
-  dataSchema: {
+  inputSchema: {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Report name' },
@@ -601,7 +734,7 @@ create_report: {
 schedule_report: {
   description: 'Set a recurring schedule for an existing report',
   type: 'trigger_tool',
-  dataSchema: {
+  inputSchema: {
     type: 'object',
     properties: {
       reportId: { type: 'string' },
@@ -614,7 +747,7 @@ schedule_report: {
 export_report: {
   description: 'Export a report to PDF or CSV',
   type: 'trigger_tool',
-  dataSchema: {
+  inputSchema: {
     type: 'object',
     properties: {
       reportId: { type: 'string' },
@@ -645,28 +778,28 @@ Keep it as one tool when:
 When the agent finds your tools via search, they are registered as native tools in the LLM's tool-calling API. This means:
 
 1. Your tool's `description` becomes the tool description
-2. Your tool's `dataSchema` becomes the tool's `parameters` JSON Schema
+2. Your tool's `inputSchema` becomes the tool's `parameters` JSON Schema
 3. The AI calls the tool by name with structured arguments matching your schema
 4. The SDK executes your handler with those arguments and returns the result
 
-This is why `dataSchema` quality matters so much. The schema _is_ the tool definition the model sees.
+This is why `inputSchema` quality matters so much. The schema _is_ the tool definition the model sees.
 
 ```
 Client defines tool            Server registers tool           AI calls tool
 +------------------+          +---------------------+         +-----------------+
 | name: invite_user|   sync   | name: invite_user   |  call   | invite_user({   |
 | description: ... | -------> | description: ...    | ------> |   email: "...", |
-| dataSchema: {    |          | parameters: {       |         |   role: "admin" |
+| inputSchema: {   |          | parameters: {       |         |   role: "admin" |
 |   email, role    |          |   email, role       |         | })              |
 | }                |          | }                   |         |                 |
 +------------------+          +---------------------+         +-----------------+
 ```
 
-Tools with `returns: true` (or `type: 'query'`) send the handler's return value back to the agent for further reasoning.
+All tools defined with `usePillarTool` or `defineTool` send the `execute` handler's return value back to the agent for further reasoning.
 
 ## Schema Compatibility
 
-Pillar routes tool calls to multiple LLM providers (OpenAI, Anthropic, Google Gemini via OpenRouter). Gemini validates schemas more strictly than other providers and will reject tool calls with a 400 error if the schema is invalid. Follow these rules in every `dataSchema`:
+Pillar routes tool calls to multiple LLM providers (OpenAI, Anthropic, Google Gemini via OpenRouter). Gemini validates schemas more strictly than other providers and will reject tool calls with a 400 error if the schema is invalid. Follow these rules in every `inputSchema`:
 
 1. **Arrays need `items`** - `{ type: 'array' }` is invalid. Use `{ type: 'array', items: { type: 'string' } }` or similar.
 2. **`type` must be a single string** - `type: ['string', 'null']` is invalid. Use `type: 'string'` and note nullability in the description.
@@ -729,7 +862,7 @@ For complex schemas, you can provide concrete examples of valid parameter object
 create_report: {
   description: 'Create a new report with filters',
   type: 'trigger_tool',
-  dataSchema: {
+  inputSchema: {
     type: 'object',
     properties: {
       name: { type: 'string' },

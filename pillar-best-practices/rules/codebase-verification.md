@@ -41,16 +41,20 @@ Never fabricate API shapes. A tool with wrong field names will silently fail at 
 ```tsx
 // Bad -- assumed the field is called "userId"
 inputSchema: {
+  type: 'object',
   properties: {
     userId: { type: 'string' },
   },
+  required: ['userId'],
 }
 
 // Good -- read the API handler and found it expects "user_id"
 inputSchema: {
+  type: 'object',
   properties: {
     user_id: { type: 'string' },
   },
+  required: ['user_id'],
 }
 ```
 

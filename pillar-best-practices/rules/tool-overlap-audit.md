@@ -8,7 +8,7 @@ Before creating or substantially modifying a tool, audit the existing tools in t
 
 ## How to Audit
 
-1. **Find all tool definitions.** Search the codebase for tool definition patterns -- objects with `description`, `type`, and optionally `examples`, `dataSchema`, or `guidance`. Common locations: `actions/`, `tools/`, `lib/pillar/`.
+1. **Find all tool definitions.** Search the codebase for tool definition patterns -- objects with `description`, `type`, and optionally `examples`, `inputSchema`, or `guidance`. Common locations: `actions/`, `tools/`, `lib/pillar/`.
 2. **Compare descriptions.** Look for tools whose descriptions cover similar intent. Two tools that both mention "create a dashboard" or "invite a user" are candidates for overlap.
 3. **Compare examples.** Check `examples` arrays for phrases that would match both the existing and proposed tool. If "add a panel" appears in both `create_visualization` and `add_panel_to_dashboard`, one of them will be picked arbitrarily.
 4. **Compare schemas.** If two tools accept similar parameters (same field names, same types), they likely serve the same intent.

@@ -2,7 +2,7 @@
 
 **Preferred pattern:** Use `pillar.defineTool()` for new code — it co-locates the definition and handler in a single call, preventing drift. See the `defineTool()` section in AGENTS.md.
 
-**Legacy pattern (`onTask`):** Use the centralized handler component below when working with existing codebases that use `defineActions` + `onTask()`. Handlers must be registered when the SDK is ready and cleaned up on unmount to prevent memory leaks.
+**Legacy pattern (`onTask`):** Use the centralized handler component below when working with existing codebases that use `onTask()`. Handlers must be registered when the SDK is ready and cleaned up on unmount to prevent memory leaks.
 
 ## Bad
 
@@ -64,17 +64,15 @@ export function PillarToolHandlers() {
     const handlers = [
       pillar.onTask('navigate', ({ path }) => {
         router.push(path);
-        return { success: true };
       }),
 
       pillar.onTask('open_modal', ({ modalId }) => {
         openModal(modalId);
-        return { success: true };
       }),
 
       pillar.onTask('copy_api_key', () => {
         navigator.clipboard.writeText(apiKey);
-        return { success: true, message: 'API key copied!' };
+        return { message: 'API key copied!' };
       }),
     ];
 
@@ -105,12 +103,12 @@ const tools = {
   get_available_datasources: {
     description: 'Get datasources available for creating visualizations.',
     guidance: 'Call BEFORE creating dashboards or panels. If zero results, ask user to create one.',
-    type: 'trigger_action',
+    type: 'trigger_tool',
   },
   create_dashboard: {
     description: 'Create a new empty dashboard.',
     guidance: 'First step when building a new dashboard. Returns dashboard_uid needed by all create_*_panel tools.',
-    type: 'trigger_action',
+    type: 'trigger_tool',
     inputSchema: {
       type: 'object',
       properties: {
@@ -126,44 +124,60 @@ See `rules/guidance-field.md` for full details on when and how to use guidance.
 
 ## Handler Return Values
 
-Always return a result object:
+What your `execute` function returns is what the agent sees. Return flat, JSON-serializable data directly.
 
 ```tsx
-// Success
-return { success: true };
+// Return flat data — the agent receives this object
+execute: async ({ status }) => {
+  const expenses = await api.listExpenses({ status });
+  return { expenses, total: expenses.length };
+}
 
-// Success with user message
-return { success: true, message: 'Settings saved!' };
+// Side-effect only — return nothing
+execute: ({ path }) => { router.push(path); }
 
-// Failure with error message
-return { success: false, message: 'Failed to save. Please try again.' };
+// Failure — throw an Error (SDK sends { success: false, error: "..." } to the agent)
+throw new Error('Failed to save. Please try again.');
 ```
+
+**Common mistake — returning `{ success: true }` without data:**
+
+```tsx
+// BAD: the agent only sees { success: true } — the actual data is lost
+execute: async (params) => {
+  const result = await api.listExpenses(params);
+  return { success: true };
+}
+
+// GOOD: return the data directly
+execute: async (params) => {
+  const result = await api.listExpenses(params);
+  return { expenses: result.items, total: result.total };
+}
+```
+
+The SDK's normalizer only unwraps the `data` key from `{ success, data }` envelopes. Any other nesting (e.g., `{ success: true, result: {...} }`) passes through as-is, so the agent sees `success: true` alongside your nested key instead of just the data.
 
 ## Return JSON-Serializable Data
 
-If the tool returns data to the agent, make sure it can be JSON serialized.
+Make sure return values can be JSON serialized.
 
 ```tsx
 // Good - plain data
-return { success: true, id: result.id, name: result.name };
+return { id: result.id, name: result.name };
 
 // Bad - non-serializable values
-return { success: true, element: document.body, handler: () => {} };
+return { element: document.body, handler: () => {} };
 ```
 
 ## Error Handling
 
-Wrap handlers in try-catch for graceful error handling:
+Let errors propagate — the SDK catches them and reports them to the agent. Use try-catch only when you need custom cleanup or logging:
 
 ```tsx
 pillar.onTask('export_data', async (data) => {
-  try {
-    await exportData(data);
-    return { success: true, message: 'Export complete!' };
-  } catch (error) {
-    console.error('Export failed:', error);
-    return { success: false, message: 'Export failed. Please try again.' };
-  }
+  await exportData(data);
+  return { message: 'Export complete!' };
 });
 ```
 
@@ -187,8 +201,7 @@ useEffect(() => {
 
   const handlers = [
     pillar.onTask('navigate', ({ path }) => {
-      router.push(path);  // Uses router
-      return { success: true };
+      router.push(path);
     }),
   ];
 

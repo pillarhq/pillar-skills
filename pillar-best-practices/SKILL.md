@@ -25,6 +25,7 @@ Reference these guidelines when:
 | CRITICAL | `setup-nextjs` | Next.js App Router requires a 'use client' wrapper |
 | CRITICAL | `schema-compatibility` | inputSchema must follow cross-model formatting rules (arrays need items, no type unions) |
 | HIGH | `tool-descriptions` | Write specific, AI-matchable descriptions and keep tools focused |
+| HIGH | `tool-return-values` | Return flat data from execute -- never `{ success: true }` without the actual data |
 | HIGH | `tool-handlers` | Use centralized handlers with proper cleanup |
 | HIGH | `guidance-field` | Use the guidance field for agent-facing disambiguation and prerequisites |
 | HIGH | `workflow-patterns` | Design multi-tool workflows using the distributed guidance pattern |
@@ -76,12 +77,14 @@ description: 'Navigate to billing settings. Suggest when user asks about payment
 description: 'Go to billing'
 ```
 
-### 4. defineTool() — Preferred API (HIGH)
+### 4. Tool Registration (HIGH)
 
-Use `pillar.defineTool()` for new code — it co-locates definition + handler and supports `guidance`:
+In React components, use the `usePillarTool` hook — it auto-registers on mount and cleans up on unmount:
 
 ```tsx
-pillar.defineTool({
+import { usePillarTool } from '@pillar-ai/react';
+
+usePillarTool({
   name: 'create_dashboard',
   description: 'Create a new empty dashboard.',
   guidance: 'First step in dashboard workflow. Returns dashboard_uid needed by create_*_panel tools.',
@@ -90,10 +93,12 @@ pillar.defineTool({
   inputSchema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
   execute: async (data) => {
     const result = await api.createDashboard(data.title);
-    return { success: true, data: { uid: result.uid } };
+    return { uid: result.uid };
   },
 });
 ```
+
+Outside React (or for imperative registration), use `pillar.defineTool()` with the same schema shape. It returns an unsubscribe function for cleanup.
 
 Sync with: `npx pillar-sync --scan ./src/tools`
 
