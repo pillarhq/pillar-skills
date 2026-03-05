@@ -24,7 +24,7 @@ Skills are reusable capabilities for AI coding agents that provide procedural kn
 
 ## Documentation
 
-**[View Full Documentation](https://trypillar.com/docs)** | [SDK Quick Start](https://trypillar.com/docs/getting-started/quick-start) | [skills.sh](https://skills.sh)
+**[View Full Documentation](https://trypillar.com/docs)** | [SDK Quick Start](https://trypillar.com/docs/get-started/quickstart) | [skills.sh](https://skills.sh)
 
 ## Installation
 
