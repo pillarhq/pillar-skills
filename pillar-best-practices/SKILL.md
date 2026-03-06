@@ -31,6 +31,7 @@ Reference these guidelines when:
 | HIGH | `workflow-patterns` | Design multi-tool workflows using the distributed guidance pattern |
 | HIGH | `tool-overlap-audit` | Audit existing tools for overlap before creating new ones |
 | HIGH | `codebase-verification` | Verify API shapes against the actual codebase -- never guess |
+| HIGH | `form-queue-pattern` | For form-opening tools, defer completion until user submits; queue multiple forms for sequential execution |
 
 ## Quick Reference
 
@@ -148,4 +149,5 @@ rules/guidance-field.md
 rules/workflow-patterns.md
 rules/tool-overlap-audit.md
 rules/codebase-verification.md
+rules/form-queue-pattern.md
 ```
