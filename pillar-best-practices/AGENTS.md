@@ -1,17 +1,167 @@
-# Pillar SDK Complete Reference
+# Pillar SDK & CLI Complete Reference
 
-This is the complete reference for integrating the Pillar SDK. It covers installation, configuration, tools, handlers, and advanced features.
+This is the complete reference for integrating Pillar into a web application. It covers the CLI (project setup, tool syncing, knowledge sources, diagnostics) and the SDK (provider, tools, handlers, hooks, and advanced features).
 
 ## Overview
 
-Pillar SDK provides an AI-powered assistant panel for your application. Users can ask questions, and the AI can suggest tools that execute directly in your app.
+Pillar provides an AI-powered assistant panel for your application. Users can ask questions, and the AI can suggest tools that execute directly in your app.
 
 **What you'll build:**
 - A slide-out assistant panel with AI chat
 - A sidebar trigger (or custom button) that opens the panel
 - Tools the AI can suggest to users
 
-## Installation
+---
+
+## CLI
+
+### Install
+
+Run directly with npx (recommended):
+
+```bash
+npx pillar-cli init
+```
+
+Or install globally:
+
+```bash
+npm install -g pillar-cli
+pillar <command>
+```
+
+### pillar init
+
+Set up Pillar in your project. Detects your framework, installs the SDK, generates provider and tool files, syncs tools, and creates knowledge sources from your docs.
+
+```bash
+pillar init
+pillar init --product-key your-slug    # skip product selection
+pillar init --force                     # skip "already initialized" prompt
+```
+
+What it does:
+
+1. Detects your framework (Next.js, Vite+React, Vue, Angular, vanilla)
+2. Authenticates via browser login
+3. Selects or creates a product
+4. Installs the correct SDK package
+5. Creates provider wrapper, starter tools, and `.env.local`
+6. Creates a sync secret and runs an initial tool sync
+7. Detects docs URLs and creates knowledge sources
+
+Generated files for Next.js:
+
+| File | Purpose |
+|------|---------|
+| `components/pillar-provider.tsx` | Client component wrapping `PillarProvider` |
+| `lib/pillar-tools.ts` | Starter tools with `navigate_to_page` and `get_current_page` |
+| `.env.local` | `NEXT_PUBLIC_PILLAR_SLUG` and `PILLAR_SECRET` |
+
+### pillar sync
+
+Scan your codebase for tool definitions and sync them to Pillar's backend:
+
+```bash
+pillar sync --scan ./src              # one-time sync
+pillar sync --scan ./src --watch      # watch and re-sync on change
+pillar sync --scan ./src --force      # force sync even if unchanged
+pillar sync --scan ./src --local      # print manifest without syncing
+pillar sync status --scan ./src       # compare local vs remote
+```
+
+The scanner uses the TypeScript compiler API to statically extract metadata from `defineTool()` and `usePillarTool()` calls: `name`, `description`, `guidance`, `type`, `inputSchema`, `outputSchema`, `examples`, `autoRun`, `autoComplete`.
+
+Fields must be inline literals — the scanner cannot resolve variable references or computed values.
+
+#### AGENT_GUIDANCE.md
+
+Place an `AGENT_GUIDANCE.md` in the scan directory root. The scanner includes it in the manifest automatically:
+
+```markdown
+<!-- src/tools/AGENT_GUIDANCE.md -->
+PREFER API TOOLS OVER NAVIGATION:
+- When both an API tool and a navigation tool can accomplish a task, prefer the API tool
+
+ORDER FULFILLMENT WORKFLOW:
+When a user asks to process an order:
+1. Use get_order to fetch order details
+2. Use validate_inventory to check stock
+3. Use create_shipment to generate shipping label
+4. Use notify_customer to send confirmation
+```
+
+#### CI/CD
+
+```yaml
+# GitHub Actions
+- name: Sync Pillar tools
+  run: npx pillar-cli sync --scan ./src
+  env:
+    PILLAR_SLUG: ${{ secrets.PILLAR_SLUG }}
+    PILLAR_SECRET: ${{ secrets.PILLAR_SECRET }}
+```
+
+### pillar knowledge
+
+Manage knowledge sources — docs sites, help centers, and other content the copilot uses to answer questions:
+
+```bash
+pillar knowledge add https://docs.myapp.com    # add and start crawling
+pillar knowledge list                           # list all sources
+pillar knowledge status                         # health overview
+pillar knowledge status <source-id>             # sync history for one source
+pillar knowledge sync <source-id>               # re-trigger crawl
+pillar knowledge remove <source-id>             # delete a source
+```
+
+Source types are auto-detected: `github.com` → GitHub, `notion.so` → Notion, everything else → website crawl.
+
+### pillar doctor
+
+Check integration health:
+
+```bash
+pillar doctor
+```
+
+Validates: CLI version, product key, sync secret, SDK version, tool sync status (local vs remote count), knowledge source health, and embed config reachability.
+
+### pillar chat
+
+Test your copilot from the terminal:
+
+```bash
+pillar chat "how do I export my data?"    # single question
+pillar chat                                # interactive mode
+pillar chat --conversation <id>            # resume conversation
+```
+
+### pillar auth
+
+Manage authentication:
+
+```bash
+pillar auth login     # opens browser to authenticate
+pillar auth status    # check current session
+pillar auth logout    # clear credentials
+```
+
+Credentials are stored in `~/.pillar/config.json`.
+
+### Configuration
+
+The CLI reads configuration from multiple sources (highest priority first):
+
+1. **Environment variables** — `PILLAR_SLUG`, `PILLAR_SECRET`, `PILLAR_API_URL`
+2. **Config file** — `~/.pillar/config.json` (written by `pillar auth login` and `pillar init`)
+3. **Project env** — `.env.local` in the current directory
+
+---
+
+## SDK
+
+### Installation
 
 ```bash
 npm install @pillar-ai/sdk @pillar-ai/react
@@ -26,6 +176,8 @@ yarn add @pillar-ai/sdk @pillar-ai/react
 # pnpm
 pnpm add @pillar-ai/sdk @pillar-ai/react
 ```
+
+> **Note:** `pillar init` installs the SDK automatically. Manual install is only needed if you skip init.
 
 ## Provider Setup
 
@@ -286,12 +438,24 @@ Key properties of `defineTool()` and `usePillarTool()`:
 ### Automatic scanning (recommended)
 
 ```bash
-PILLAR_SLUG=my-app PILLAR_SECRET=xxx npx pillar-sync --scan ./src/tools
+pillar sync --scan ./src
 ```
 
-The scanner uses the TypeScript compiler API to statically extract metadata from `defineTool()` and `usePillarTool()` calls. It extracts: `name`, `description`, `guidance`, `type`, `inputSchema`, `examples`, `autoRun`, `autoComplete`.
+Or with explicit credentials:
+
+```bash
+PILLAR_SLUG=my-app PILLAR_SECRET=xxx npx pillar-cli sync --scan ./src
+```
+
+The scanner uses the TypeScript compiler API to statically extract metadata from `defineTool()` and `usePillarTool()` calls. It extracts: `name`, `description`, `guidance`, `type`, `inputSchema`, `outputSchema`, `examples`, `autoRun`, `autoComplete`.
 
 No barrel file or manifest needed. The scanner finds all tool definitions recursively.
+
+Use `--watch` during development for automatic re-sync:
+
+```bash
+pillar sync --scan ./src --watch
+```
 
 ### What the scanner cannot extract
 
@@ -842,7 +1006,7 @@ When a user asks to process an order:
 Then sync:
 
 ```bash
-PILLAR_SLUG=your-product PILLAR_SECRET=xxx npx pillar-sync --scan ./src/tools
+pillar sync --scan ./src/tools
 ```
 
 The scanner reads `AGENT_GUIDANCE.md` from the root of the scan directory and includes it in the manifest. This keeps your guidance in version control alongside the tool files it references.
@@ -884,7 +1048,11 @@ create_report: {
 
 ## Learn More
 
-- [Pillar SDK Documentation](https://trypillar.com/docs)
+- [Pillar Documentation](https://trypillar.com/docs)
+- [CLI Setup Guide](https://trypillar.com/docs/get-started/cli-setup)
 - [Tools Guide](https://trypillar.com/docs/guides/tools)
+- [Tool Syncing](https://trypillar.com/docs/guides/tools-sync)
+- [Knowledge Base](https://trypillar.com/docs/knowledge-base/overview)
 - [Context API](https://trypillar.com/docs/guides/context)
 - [Custom Cards](https://trypillar.com/docs/guides/custom-cards)
+- [CLI Reference](https://trypillar.com/docs/guides/cli)
