@@ -32,7 +32,7 @@ function App() {
 ## Good
 
 ```tsx
-import { PillarProvider } from '@pillar-ai/react';
+import { PillarProvider } from "@pillar-ai/react";
 
 function App() {
   return (
@@ -45,18 +45,17 @@ function App() {
 
 ## Required Props
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop         | Type     | Description                          |
+| ------------ | -------- | ------------------------------------ |
 | `productKey` | `string` | Your product key from the Pillar app |
 
 ## Optional Props
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `config` | `object` | Configuration for panel, theme, triggers |
-| `onReady` | `() => void` | Callback when SDK is initialized |
-| `onError` | `(error: Error) => void` | Callback for initialization errors |
-| `cards` | `object` | Custom card components for inline_ui tools |
+| Prop      | Type                     | Description                              |
+| --------- | ------------------------ | ---------------------------------------- |
+| `config`  | `object`                 | Configuration for panel, theme, triggers |
+| `onReady` | `() => void`             | Callback when SDK is initialized         |
+| `onError` | `(error: Error) => void` | Callback for initialization errors       |
 
 ## Environment Variables
 
