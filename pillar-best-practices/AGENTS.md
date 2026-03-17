@@ -740,7 +740,7 @@ Each step executes your registered tool handlers automatically.
 
 ## Inline UI with Render Components
 
-For `inline_ui` tools, use the `render` prop to display custom React components in the chat. The render component is co-located with your tool definition:
+For `inline_ui` tools, use the `render` prop to display custom React components in the chat. The AI agent provides data directly to the render component — no `execute` function needed:
 
 ```tsx
 import { usePillarTool } from '@pillar-ai/react';
@@ -757,10 +757,6 @@ function ProductTools() {
       },
       required: ['productId'],
     },
-    execute: async ({ productId }) => {
-      const product = await api.getProduct(productId);
-      return { product };
-    },
     render: ({ data, onConfirm, onCancel }) => (
       <ProductCard
         product={data.product}
@@ -775,7 +771,7 @@ function ProductTools() {
 ```
 
 The `render` component receives:
-- `data` — the return value from `execute`
+- `data` — the data provided by the AI agent (matching `inputSchema`)
 - `onConfirm(modifiedData?)` — call when the user confirms/completes the action
 - `onCancel()` — call when the user cancels
 - `onStateChange?(state, message?)` — optional callback for loading/success/error states
@@ -796,7 +792,6 @@ function ProductCard({ data, onConfirm, onCancel }: ToolRenderProps<{ product: P
 usePillarTool({
   name: 'show_product',
   type: 'inline_ui',
-  execute: async ({ productId }) => ({ product: await getProduct(productId) }),
   render: ProductCard,
 });
 ```
