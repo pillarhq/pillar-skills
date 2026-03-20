@@ -42,6 +42,8 @@ Reference these guidelines when:
 | HIGH | `tool-return-values` | Return flat data from execute -- never `{ success: true }` without the actual data |
 | HIGH | `tool-handlers` | Use centralized handlers with proper cleanup |
 | HIGH | `guidance-field` | Use the guidance field for agent-facing disambiguation and prerequisites |
+| HIGH | `confirmation-ui` | Use `needsConfirmation` or `renderConfirmation` for destructive actions (delete, purchase) |
+| HIGH | `inline-ui-tools` | Use `type: 'inline_ui'` with `render` for interactive UI in chat; use `sendResult` to return data to the agent |
 | HIGH | `workflow-patterns` | Design multi-tool workflows using the distributed guidance pattern |
 | HIGH | `tool-overlap-audit` | Audit existing tools for overlap before creating new ones |
 | HIGH | `codebase-verification` | Verify API shapes against the actual codebase -- never guess |
@@ -226,6 +228,38 @@ Prefer smaller tools with tight schemas over one large tool with many modes:
 invite_user: { description: 'Invite a new user by email', type: 'trigger_tool' }
 remove_user: { description: 'Remove a user from the org', type: 'trigger_tool' }
 change_user_role: { description: 'Change a user role', type: 'trigger_tool' }
+```
+
+### 14. Inline UI Tools (HIGH)
+
+Use `type: 'inline_ui'` with a `render` component for interactive UI in the chat. The AI provides data directly to the component — no `execute` needed. Use `sendResult` to return data to the agent:
+
+```tsx
+usePillarTool({
+  name: 'show_results',
+  description: 'Display search results',
+  type: 'inline_ui',
+  inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+  render: ({ data, sendResult }) => (
+    <ResultsCard data={data} onSelect={(item) => sendResult({ selected: item.id })} />
+  ),
+});
+```
+
+### 15. Confirmation UI (HIGH)
+
+Use `needsConfirmation: true` for destructive actions. The agent calls the tool, but a Confirm/Cancel card is shown before `execute` runs. For custom UI, use `renderConfirmation`:
+
+```tsx
+usePillarTool({
+  name: 'delete_project',
+  description: 'Delete a project permanently',
+  needsConfirmation: true,
+  execute: async ({ projectId }) => {
+    await api.deleteProject(projectId);
+    return { deleted: true };
+  },
+});
 ```
 
 ## How to Use
