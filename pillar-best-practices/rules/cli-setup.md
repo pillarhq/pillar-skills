@@ -23,7 +23,7 @@ pillar init
 2. **Authenticates** — Opens browser login if not already signed in
 3. **Selects product** — Picks from existing products or creates a new one
 4. **Installs SDK** — Adds the correct package (`@pillar-ai/react`, `@pillar-ai/vue`, etc.) with the project's package manager
-5. **Generates starter code** — Provider wrapper, starter tools file, `.env.local` with product key and sync secret
+5. **Generates starter code** — Provider wrapper, starter tools file, `.env.local` with agent slug and sync secret
 6. **Syncs tools** — Scans for tool definitions and pushes them to the backend
 7. **Sets up knowledge** — Detects docs URLs in the project and creates knowledge sources
 
@@ -31,7 +31,7 @@ pillar init
 
 | Flag | Description |
 |------|-------------|
-| `--product-key <slug>` | Skip product selection |
+| `--agent-slug <slug>` | Skip product selection |
 | `--force` | Skip the "already initialized" prompt |
 | `--no-validate` | Skip build validation after scaffolding |
 | `--debug` | Verbose logging |

@@ -18,7 +18,7 @@ Set these as environment variables, in `~/.pillar/config.json` (via `pillar init
 
 | Variable | Description |
 |----------|-------------|
-| `PILLAR_SLUG` | Your product key |
+| `PILLAR_SLUG` | Your agent slug |
 | `PILLAR_SECRET` | Sync secret (created by `pillar init` or in the dashboard) |
 
 ## What the scanner extracts

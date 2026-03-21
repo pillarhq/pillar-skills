@@ -36,7 +36,7 @@ Set up Pillar in your project. Detects your framework, installs the SDK, generat
 
 ```bash
 pillar init
-pillar init --product-key your-slug    # skip product selection
+pillar init --agent-slug your-slug    # skip product selection
 pillar init --force                     # skip "already initialized" prompt
 ```
 
@@ -56,7 +56,7 @@ Generated files for Next.js:
 |------|---------|
 | `components/pillar-provider.tsx` | Client component wrapping `PillarProvider` |
 | `lib/pillar-tools.ts` | Starter tools with `navigate_to_page` and `get_current_page` |
-| `.env.local` | `NEXT_PUBLIC_PILLAR_SLUG` and `PILLAR_SECRET` |
+| `.env.local` | `NEXT_PUBLIC_PILLAR_AGENT_SLUG` and `PILLAR_SECRET` |
 
 ### pillar sync
 
@@ -125,7 +125,7 @@ Check integration health:
 pillar doctor
 ```
 
-Validates: CLI version, product key, sync secret, SDK version, tool sync status (local vs remote count), knowledge source health, and embed config reachability.
+Validates: CLI version, agent slug, sync secret, SDK version, tool sync status (local vs remote count), knowledge source health, and embed config reachability.
 
 ### pillar chat
 
@@ -190,7 +190,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 function App() {
   return (
-    <PillarProvider productKey="your-product-key">
+    <PillarProvider agentSlug="your-agent-slug">
       <YourApp />
     </PillarProvider>
   );
@@ -209,7 +209,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
+    <PillarProvider agentSlug={process.env.NEXT_PUBLIC_PILLAR_AGENT_SLUG!}>
       {children}
     </PillarProvider>
   );
@@ -241,7 +241,7 @@ All configuration is optional with sensible defaults:
 
 ```tsx
 <PillarProvider
-  productKey="your-product-key"
+  agentSlug="your-agent-slug"
   config={{
     edgeTrigger: {
       enabled: true,  // Show sidebar tab on screen edge
@@ -638,7 +638,7 @@ For custom panel placement (e.g., embedding the panel inside your layout instead
 import { PillarProvider, PillarPanel } from '@pillar-ai/react';
 
 <PillarProvider
-  productKey="your-product-key"
+  agentSlug="your-agent-slug"
   config={{ panel: { container: 'manual' } }}
 >
   <div className="my-layout">
@@ -802,7 +802,7 @@ usePillarTool({
 
 ```bash
 # .env.local
-NEXT_PUBLIC_PILLAR_PRODUCT_KEY=your-product-key
+NEXT_PUBLIC_PILLAR_AGENT_SLUG=your-agent-slug
 ```
 
 ## TypeScript Support
@@ -839,7 +839,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
+    <PillarProvider agentSlug={process.env.NEXT_PUBLIC_PILLAR_AGENT_SLUG!}>
       {children}
     </PillarProvider>
   );

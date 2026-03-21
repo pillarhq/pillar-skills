@@ -68,7 +68,7 @@ Prompts for confirmation before deleting.
 ## Prerequisites
 
 - Must be authenticated (`pillar auth login`)
-- Must have a product key configured (`pillar init` or `PILLAR_SLUG`)
+- Must have an agent slug configured (`pillar init` or `PILLAR_SLUG`)
 
 ## Automatic setup via init
 

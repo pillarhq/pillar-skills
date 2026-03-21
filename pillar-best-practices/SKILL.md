@@ -61,10 +61,10 @@ npx pillar-cli init
 
 This detects your framework, installs the SDK, generates a provider wrapper and starter tools, creates credentials, syncs tools, and sets up knowledge sources. See `rules/cli-setup.md`.
 
-If you already have a product key:
+If you already have an agent slug:
 
 ```bash
-npx pillar-cli init --product-key your-slug
+npx pillar-cli init --agent-slug your-slug
 ```
 
 ### 2. Tool Syncing (HIGH)
@@ -107,7 +107,7 @@ Verify the integration is healthy:
 pillar doctor
 ```
 
-Checks product key, sync secret, SDK version, tool sync status, knowledge sources, and embed config reachability.
+Checks agent slug, sync secret, SDK version, tool sync status, knowledge sources, and embed config reachability.
 
 ### 5. Testing
 
@@ -137,7 +137,7 @@ Always wrap your app with `PillarProvider`:
 ```tsx
 import { PillarProvider } from '@pillar-ai/react';
 
-<PillarProvider productKey="your-product-key">
+<PillarProvider agentSlug="your-agent-slug">
   {children}
 </PillarProvider>
 ```
@@ -154,7 +154,7 @@ import { PillarProvider } from '@pillar-ai/react';
 
 export function PillarSDKProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PillarProvider productKey={process.env.NEXT_PUBLIC_PILLAR_PRODUCT_KEY!}>
+    <PillarProvider agentSlug={process.env.NEXT_PUBLIC_PILLAR_AGENT_SLUG!}>
       {children}
     </PillarProvider>
   );
